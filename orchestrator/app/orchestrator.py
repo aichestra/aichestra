@@ -35,27 +35,27 @@ class SmartOrchestrator:
         
         # Default agent endpoints
         default_agents = {
-            "argocd": "http://localhost:8001",
-            "currency": "http://localhost:8002",
-            "math": "http://localhost:8003"
+            "http://localhost:8001",
+            "http://localhost:8002",
+            "http://localhost:8003"
         }
         
         # Fetch agent cards using A2A client - run async initialization
         asyncio.run(self._fetch_all_agent_cards(default_agents))
     
-    async def _fetch_all_agent_cards(self, default_agents: Dict[str, str]):
+    async def _fetch_all_agent_cards(self, default_agents: List[str]):
         """Async method to fetch all agent cards"""
         async with httpx.AsyncClient(timeout=5.0) as httpx_client:
-            for agent_id, endpoint in default_agents.items():
+            for endpoint in default_agents:
                 try:
                     agent_card = await self._fetch_agent_card_with_a2a(httpx_client, endpoint)
                     if agent_card:
-                        self.agents[agent_id] = agent_card
+                        self.agents[agent_card.name] = agent_card
                         print(f"✅ Loaded {agent_card.name} from {endpoint}")
                     else:
                         print(f"⚠️  Failed to load agent card from {endpoint}")
                 except Exception as e:
-                    print(f"❌ Error loading agent {agent_id} from {endpoint}: {e}")
+                    print(f"❌ Error loading agent from {endpoint}: {e}")
     
     async def _fetch_agent_card_with_a2a(self, httpx_client: httpx.AsyncClient, endpoint: str) -> Optional[AgentCard]:
         """Fetch agent card using A2A client"""
@@ -85,7 +85,7 @@ class SmartOrchestrator:
                 agent_card = await self._fetch_agent_card_with_a2a(httpx_client, endpoint)
                 if agent_card:
                     # Generate agent_id from the endpoint
-                    agent_id = endpoint.replace("http://", "").replace("https://", "").replace("localhost:", "").replace(":", "_")
+                    agent_id = agent_card.name
                     
                     # Add the agent to our registry
                     self.agents[agent_id] = agent_card
@@ -194,7 +194,7 @@ class SmartOrchestrator:
         
         Examples:
         
-                 1. Math calculation request: "what is 2+3"
+        1. Math calculation request: "what is 2+3"
             - Math Agent: 
               * Keywords: "what is", "+" → +2.0 points (from skill tags)
               * Skills: "arithmetic_calculation" (matches "what is", "+") → +1.5 points
@@ -202,8 +202,8 @@ class SmartOrchestrator:
             - Currency Agent: 0.0 points (no matches)
             - ArgoCD Agent: 0.0 points (no matches)
             → Math Agent selected (highest score)
-         
-         2. Currency conversion request: "how much is 10 USD in INR?"
+
+        2. Currency conversion request: "how much is 10 USD in INR?"
             - Currency Agent:
               * Keywords: "usd", "inr" → +2.0 points (from skill tags)
               * Skills: "currency_exchange" (matches "usd", "inr") → +1.5 points
@@ -213,13 +213,13 @@ class SmartOrchestrator:
             → Currency Agent selected (highest score)
         
         3. ArgoCD management request: "sync my kubernetes application"
-           - ArgoCD Agent:
+            - ArgoCD Agent:
              * Keywords: "kubernetes", "sync" → +2.0 points
              * Skills: "sync_operations" (matches "sync"), "kubernetes_management" (matches "kubernetes") → +3.0 points
              * Total: 5.0 points
-           - Math Agent: 0.0 points (no matches)
-           - Currency Agent: 0.0 points (no matches) 
-           → ArgoCD Agent selected (highest score)
+            - Math Agent: 0.0 points (no matches)
+            - Currency Agent: 0.0 points (no matches) 
+            → ArgoCD Agent selected (highest score)
         
         Returns:
             tuple[float, List[str]]: (total_score, list_of_matched_skill_names)
