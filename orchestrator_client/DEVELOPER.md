@@ -61,7 +61,7 @@ sequenceDiagram
     participant Client as 🖥️ Orchestrator Client<br/>(__main__.py)
     participant A2AClient as 🔌 A2A Client<br/>(A2AClient)
     participant HTTPClient as 🌐 HTTP Client<br/>(httpx.AsyncClient)
-    participant Discovery as 🔍 Agent Discovery<br/>(display_available_agents)
+    participant Discovery as 🔍 Agent Discovery<br/>(list_available_agents)
     participant PushListener as 📡 Push Listener<br/>(PushNotificationListener)
     participant Agent as 🤖 Target Agent<br/>(Orchestrator/Direct)
     participant Formatter as 🎨 Response Formatter<br/>(format_ai_response)
@@ -89,7 +89,7 @@ sequenceDiagram
     Client->>Client: print(card.model_dump_json())<br/>__main__.py:170
     Note right of Client: Display agent card
 
-    Client->>Discovery: display_available_agents(httpx_client, agent, card)<br/>__main__.py:173
+    Client->>Discovery: list_available_agents(httpx_client, agent, card)<br/>__main__.py:173
     Note right of Client: Discover available agents
 
     Discovery->>HTTPClient: GET http://localhost:8001/.well-known/agent.json<br/>__main__.py:108
@@ -201,7 +201,7 @@ sequenceDiagram
 
 **Implementation:**
 ```python
-async def display_available_agents(httpx_client, agent_url: str, card):
+async def list_available_agents(httpx_client, agent_url: str, card):
     """Display available agents if connecting to orchestrator"""
     if "orchestrator" in card.name.lower():
         agent_endpoints = [
@@ -372,7 +372,7 @@ class TestOrchestratorClient:
             mock_get.return_value = mock_response
             
             # Test discovery logic
-            await display_available_agents(mock_client, "http://localhost:8000", mock_card)
+            await list_available_agents(mock_client, "http://localhost:8000", mock_card)
             
             assert mock_get.called
     
