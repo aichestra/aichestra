@@ -121,33 +121,13 @@ async def display_available_agents(httpx_client, agent_url: str, card):
             print("🤖 AVAILABLE AGENTS")
             print("="*60)
             
-            # Try to discover agents by checking common ports
-            agent_endpoints = [
-                ("ArgoCD Agent", "http://localhost:8001"),
-                ("Currency Agent", "http://localhost:8002"), 
-                ("Math Agent", "http://localhost:8003")
-            ]
-            
-            available_agents = []
-            for name, endpoint in agent_endpoints:
-                try:
-                    response = await httpx_client.get(f"{endpoint}/.well-known/agent.json", timeout=2.0)
-                    if response.status_code == 200:
-                        agent_data = response.json()
-                        available_agents.append({
-                            "name": agent_data.get("name", name),
-                            "description": agent_data.get("description", ""),
-                            "url": endpoint,
-                            "skills": agent_data.get("skills", [])
-                        })
-                except:
-                    # Agent not available
-                    pass
+            # Get agents from orchestrator via API call
+            available_agents = await get_agents_from_orchestrator(httpx_client, agent_url)
             
             if available_agents:
                 print(f"Found {len(available_agents)} available agents:")
                 for i, agent in enumerate(available_agents, 1):
-                    print(f"\n{i}. {agent['name']} ({agent['url']})")
+                    print(f"\n{i}. {agent['name']} ({agent['endpoint']})")
                     print(f"   Description: {agent['description']}")
                     if agent['skills']:
                         skills_text = ", ".join([skill.get('name', 'Unknown') for skill in agent['skills'][:3]])
@@ -164,15 +144,94 @@ async def display_available_agents(httpx_client, agent_url: str, card):
         pass
 
 
+async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
+    """Get agent list from orchestrator via API call"""
+    try:
+        # Create A2A client and request agent list
+        card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
+        card = await card_resolver.get_agent_card()
+        
+        client = A2AClient(httpx_client, agent_card=card)
+        
+        # Send LIST_AGENTS request
+        message = Message(
+            role="user",
+            parts=[TextPart(text="LIST_AGENTS")],
+            messageId=str(uuid4()),
+        )
+        
+        payload = MessageSendParams(
+            message=message,
+            configuration=MessageSendConfiguration(
+                acceptedOutputModes=["text"],
+            ),
+        )
+        
+        response = await client.send_message(
+            SendMessageRequest(
+                id=str(uuid4()),
+                params=payload,
+            )
+        )
+        
+        # Handle response
+        if hasattr(response, 'root') and hasattr(response.root, 'result'):
+            result = response.root.result
+            
+            # If it's a task, wait for completion
+            if isinstance(result, Task):
+                task_id = result.id
+                
+                # Poll for completion
+                for _ in range(10):
+                    await asyncio.sleep(0.5)
+                    task_response = await client.get_task(
+                        GetTaskRequest(
+                            id=str(uuid4()),
+                            params=TaskQueryParams(id=task_id),
+                        )
+                    )
+                    
+                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
+                        task_data = task_response.root.result
+                        if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
+                            if task_data.status.state == TaskState.completed:
+                                if hasattr(task_data, 'artifacts') and task_data.artifacts:
+                                    for artifact in task_data.artifacts:
+                                        if hasattr(artifact, 'parts'):
+                                            for part in artifact.parts:
+                                                if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                                                    # Parse the JSON response
+                                                    import json
+                                                    agent_data = json.loads(part.root.text)
+                                                    if agent_data.get("type") == "agent_list":
+                                                        return agent_data.get("agents", [])
+                                return []
+            
+            # If it's a direct message response
+            elif isinstance(result, Message):
+                for part in result.parts:
+                    if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                        import json
+                        agent_data = json.loads(part.root.text)
+                        if agent_data.get("type") == "agent_list":
+                            return agent_data.get("agents", [])
+        
+        return []
+    except Exception as e:
+        print(f"⚠️  Could not get agent list from orchestrator: {e}")
+        return []
+
+
 @click.command()
-@click.option("--agent", default="http://localhost:10000")
+@click.option("--orchestrator", default="http://localhost:80000")
 @click.option("--session", default=0)
 @click.option("--history", default=False)
 @click.option("--use_push_notifications", default=False)
 @click.option("--push_notification_receiver", default="http://localhost:5000")
 @click.option("--header", multiple=True)
 async def orchestratorClient(
-    agent,
+    orchestrator,
     session,
     history,
     use_push_notifications: bool,
@@ -182,14 +241,14 @@ async def orchestratorClient(
     headers = {h.split("=")[0]: h.split("=")[1] for h in header}
     print(f"Will use headers: {headers}")
     async with httpx.AsyncClient(timeout=30, headers=headers) as httpx_client:
-        card_resolver = A2ACardResolver(httpx_client, agent)
+        card_resolver = A2ACardResolver(httpx_client, orchestrator)
         card = await card_resolver.get_agent_card()
 
         print("======= Agent Card ========")
         print(card.model_dump_json(exclude_none=True))
         
         # Try to get available agents information from orchestrator
-        await display_available_agents(httpx_client, agent, card)
+        await display_available_agents(httpx_client, orchestrator, card)
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
         notification_receiver_host = notif_receiver_parsed.hostname
@@ -201,7 +260,7 @@ async def orchestratorClient(
             )
 
             notification_receiver_auth = PushNotificationReceiverAuth()
-            await notification_receiver_auth.load_jwks(f"{agent}/.well-known/jwks.json")
+            await notification_receiver_auth.load_jwks(f"{orchestrator}/.well-known/jwks.json")
 
             push_notification_listener = PushNotificationListener(
                 host=notification_receiver_host,
