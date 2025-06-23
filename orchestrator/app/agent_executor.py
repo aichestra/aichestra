@@ -58,29 +58,55 @@ class OrchestratorAgentExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task.id, task.contextId)
         
         try:
-            # Process the request through the orchestrator
-            result = await self.orchestrator.process_request(query)
-            logger.info(f"Orchestrator result: {result}")
-            
-            # Update task status
-            await updater.update_status(
-                TaskState.working,
-                new_agent_text_message(
-                    "Processing request through orchestrator...",
-                    task.contextId,
-                    task.id,
-                ),
-            )
-            
-            # Format the response
-            if result.get("success", False):
-                response_text = f"✅ Routed to {result.get('selected_agent_name', 'Unknown Agent')}\n"
-                response_text += f"Confidence: {result.get('confidence', 0):.2f}\n"
-                response_text += f"Reasoning: {result.get('reasoning', 'No reasoning provided')}\n"
-                response_text += f"Response: {result.get('response', 'No response')}"
+            # Check if this is a list agents request
+            if query.strip() == "LIST_AGENTS":
+                logger.info("Listing available agents")
+                
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        "Retrieving available agents...",
+                        task.contextId,
+                        task.id,
+                    ),
+                )
+                
+                # Get available agents
+                agents = self.orchestrator.get_available_agents()
+                logger.info(f"Available agents: {len(agents)}")
+                
+                # Format as JSON for the client
+                import json
+                response_text = json.dumps({
+                    "type": "agent_list",
+                    "agents": agents,
+                    "total_count": len(agents)
+                }, indent=2)
+                
             else:
-                response_text = f"❌ Error: {result.get('error', 'Unknown error')}"
-                logger.error(f"Orchestrator error: {result.get('error', 'Unknown error')}")
+                # Process the request through the orchestrator
+                result = await self.orchestrator.process_request(query)
+                logger.info(f"Orchestrator result: {result}")
+                
+                # Update task status
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        "Processing request through orchestrator...",
+                        task.contextId,
+                        task.id,
+                    ),
+                )
+                
+                # Format the response
+                if result.get("success", False):
+                    response_text = f"✅ Routed to {result.get('selected_agent_name', 'Unknown Agent')}\n"
+                    response_text += f"Confidence: {result.get('confidence', 0):.2f}\n"
+                    response_text += f"Reasoning: {result.get('reasoning', 'No reasoning provided')}\n"
+                    response_text += f"Response: {result.get('response', 'No response')}"
+                else:
+                    response_text = f"❌ Error: {result.get('error', 'Unknown error')}"
+                    logger.error(f"Orchestrator error: {result.get('error', 'Unknown error')}")
             
             # Complete the task
             await updater.add_artifact(
