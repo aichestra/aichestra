@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, TypedDict
 import httpx
 from langgraph.graph import StateGraph
 from a2a.types import AgentCard, AgentSkill, AgentCapabilities
+from a2a.client import A2AClient, A2ACardResolver
 
 class RouterState(TypedDict):
     request: str
@@ -30,7 +31,7 @@ class SmartOrchestrator:
         self._initialize_default_agents()
     
     def _initialize_default_agents(self):
-        """Initialize default agents by fetching their agent cards from /.well-known/agent.json"""
+        """Initialize default agents by fetching their agent cards using A2A client"""
         
         # Default agent endpoints
         default_agents = {
@@ -39,53 +40,73 @@ class SmartOrchestrator:
             "math": "http://localhost:8003"
         }
         
-        # Fetch agent cards dynamically
-        for agent_id, endpoint in default_agents.items():
-            try:
-                agent_card = self._fetch_agent_card(endpoint)
-                if agent_card:
-                    self.agents[agent_id] = agent_card
-                    print(f"✅ Loaded {agent_card.name} from {endpoint}")
-                else:
-                    print(f"⚠️  Failed to load agent card from {endpoint}")
-            except Exception as e:
-                print(f"❌ Error loading agent {agent_id} from {endpoint}: {e}")
+        # Fetch agent cards using A2A client - run async initialization
+        asyncio.run(self._fetch_all_agent_cards(default_agents))
     
-    def _fetch_agent_card(self, endpoint: str) -> Optional[AgentCard]:
-        """Fetch agent card from /.well-known/agent.json endpoint"""
+    async def _fetch_all_agent_cards(self, default_agents: Dict[str, str]):
+        """Async method to fetch all agent cards"""
+        async with httpx.AsyncClient(timeout=5.0) as httpx_client:
+            for agent_id, endpoint in default_agents.items():
+                try:
+                    agent_card = await self._fetch_agent_card_with_a2a(httpx_client, endpoint)
+                    if agent_card:
+                        self.agents[agent_id] = agent_card
+                        print(f"✅ Loaded {agent_card.name} from {endpoint}")
+                    else:
+                        print(f"⚠️  Failed to load agent card from {endpoint}")
+                except Exception as e:
+                    print(f"❌ Error loading agent {agent_id} from {endpoint}: {e}")
+    
+    async def _fetch_agent_card_with_a2a(self, httpx_client: httpx.AsyncClient, endpoint: str) -> Optional[AgentCard]:
+        """Fetch agent card using A2A client"""
         try:
-            import httpx
-            import json
+            # Create A2A card resolver
+            resolver = A2ACardResolver(
+                httpx_client=httpx_client,
+                base_url=endpoint
+            )
             
-            # Remove trailing slash and add the well-known path
-            base_url = endpoint.rstrip('/')
-            agent_json_url = f"{base_url}/.well-known/agent.json"
-            
-            # Use synchronous client for initialization
-            with httpx.Client(timeout=5.0) as client:
-                response = client.get(agent_json_url)
-                response.raise_for_status()
+            # Fetch agent card using the resolver
+            agent_card = await resolver.get_agent_card()
+            return agent_card
                 
-                # Parse the JSON response
-                agent_data = response.json()
-                
-                # Convert to AgentCard using A2A SDK
-                agent_card = AgentCard.model_validate(agent_data)
-                return agent_card
-                
-        except httpx.HTTPError as e:
-            print(f"HTTP error fetching agent card from {endpoint}: {e}")
-            return None
-        except json.JSONDecodeError as e:
-            print(f"JSON decode error for agent card from {endpoint}: {e}")
-            return None
         except Exception as e:
-            print(f"Unexpected error fetching agent card from {endpoint}: {e}")
+            print(f"Error fetching agent card from {endpoint} using A2A client: {e}")
             return None
     
     def add_agent(self, agent_id: str, agent_card: AgentCard):
         """Add a new agent using A2A SDK AgentCard"""
         self.agents[agent_id] = agent_card
+    
+    async def register_agent(self, endpoint: str) -> Dict:
+        """Register a new agent by fetching its agent card from the endpoint"""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as httpx_client:
+                agent_card = await self._fetch_agent_card_with_a2a(httpx_client, endpoint)
+                if agent_card:
+                    # Generate agent_id from the endpoint
+                    agent_id = endpoint.replace("http://", "").replace("https://", "").replace("localhost:", "").replace(":", "_")
+                    
+                    # Add the agent to our registry
+                    self.agents[agent_id] = agent_card
+                    
+                    return {
+                        "success": True,
+                        "agent_id": agent_id,
+                        "agent_name": agent_card.name,
+                        "endpoint": endpoint,
+                        "message": f"Successfully registered {agent_card.name} from {endpoint}"
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Failed to fetch agent card from {endpoint}"
+                    }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error registering agent from {endpoint}: {str(e)}"
+            }
     
     def get_available_agents(self) -> List[Dict]:
         """Get available agents in a format compatible with existing code"""
