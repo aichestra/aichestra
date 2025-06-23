@@ -108,6 +108,58 @@ class SmartOrchestrator:
                 "error": f"Error registering agent from {endpoint}: {str(e)}"
             }
     
+    async def unregister_agent(self, agent_identifier: str) -> Dict:
+        """Unregister an agent by agent_id, endpoint, or name"""
+        try:
+            agent_to_remove = None
+            agent_id_to_remove = None
+            
+            # Try to find the agent by different identifiers
+            for agent_id, agent_card in self.agents.items():
+                # Match by agent_id
+                if agent_id == agent_identifier:
+                    agent_to_remove = agent_card
+                    agent_id_to_remove = agent_id
+                    break
+                # Match by endpoint/URL
+                elif agent_card.url == agent_identifier:
+                    agent_to_remove = agent_card
+                    agent_id_to_remove = agent_id
+                    break
+                # Match by name
+                elif agent_card.name.lower() == agent_identifier.lower():
+                    agent_to_remove = agent_card
+                    agent_id_to_remove = agent_id
+                    break
+                # Match by partial endpoint (e.g., localhost:8080)
+                elif agent_identifier in agent_card.url:
+                    agent_to_remove = agent_card
+                    agent_id_to_remove = agent_id
+                    break
+            
+            if agent_to_remove and agent_id_to_remove:
+                # Remove the agent from registry
+                del self.agents[agent_id_to_remove]
+                
+                return {
+                    "success": True,
+                    "agent_id": agent_id_to_remove,
+                    "agent_name": agent_to_remove.name,
+                    "endpoint": agent_to_remove.url,
+                    "message": f"Successfully unregistered {agent_to_remove.name} (ID: {agent_id_to_remove})"
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": f"Agent not found: {agent_identifier}. Available agents: {list(self.agents.keys())}"
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Error unregistering agent {agent_identifier}: {str(e)}"
+            }
+    
     def get_available_agents(self) -> List[Dict]:
         """Get available agents in a format compatible with existing code"""
         agents = []
