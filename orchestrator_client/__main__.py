@@ -112,8 +112,8 @@ def format_ai_response(content):
     return False
 
 
-async def display_available_agents(httpx_client, agent_url: str, card):
-    """Display available agents if connecting to orchestrator"""
+async def list_available_agents(httpx_client, agent_url: str, card):
+    """List available agents if connecting to orchestrator"""
     try:
         # Check if this is the orchestrator by looking at the agent card
         if "orchestrator" in card.name.lower() or "routing" in card.description.lower():
@@ -144,19 +144,30 @@ async def display_available_agents(httpx_client, agent_url: str, card):
         pass
 
 
-async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
-    """Get agent list from orchestrator via API call"""
+async def send_orchestrator_command(httpx_client, orchestrator_url: str, command: str, timeout_seconds: int = 10, poll_interval: float = 0.5):
+    """
+    Common function to send commands to orchestrator via A2A protocol
+    
+    Args:
+        httpx_client: HTTP client instance
+        orchestrator_url: URL of the orchestrator
+        command: Command to send (e.g., "LIST_AGENTS", "REGISTER_AGENT:url", "UNREGISTER_AGENT:id")
+        timeout_seconds: Maximum time to wait for task completion
+        poll_interval: Interval between polling attempts
+    
+    Returns:
+        dict: Response data with 'success', 'data', and optional 'error' fields
+    """
     try:
-        # Create A2A client and request agent list
+        # Create A2A client
         card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
         card = await card_resolver.get_agent_card()
-        
         client = A2AClient(httpx_client, agent_card=card)
         
-        # Send LIST_AGENTS request
+        # Send command
         message = Message(
             role=Role.user,
-            parts=[Part(root=TextPart(text="LIST_AGENTS"))],
+            parts=[Part(root=TextPart(text=command))],
             messageId=str(uuid4()),
         )
         
@@ -183,8 +194,9 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
                 task_id = result.id
                 
                 # Poll for completion
-                for _ in range(10):
-                    await asyncio.sleep(0.5)
+                max_polls = int(timeout_seconds / poll_interval)
+                for _ in range(max_polls):
+                    await asyncio.sleep(poll_interval)
                     task_response = await client.get_task(
                         GetTaskRequest(
                             id=str(uuid4()),
@@ -196,26 +208,78 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
                         task_data = task_response.root.result
                         if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
                             if task_data.status.state == TaskState.completed:
+                                # Extract response text from artifacts
+                                response_text = ""
                                 if hasattr(task_data, 'artifacts') and task_data.artifacts:
                                     for artifact in task_data.artifacts:
                                         if hasattr(artifact, 'parts'):
                                             for part in artifact.parts:
                                                 if hasattr(part, 'root') and isinstance(part.root, TextPart):
-                                                    # Parse the JSON response
-                                                    import json
-                                                    agent_data = json.loads(part.root.text)
-                                                    if agent_data.get("type") == "agent_list":
-                                                        return agent_data.get("agents", [])
-                                return []
+                                                    response_text = part.root.text
+                                                    break
+                                
+                                return {
+                                    "success": True,
+                                    "data": response_text,
+                                    "task_id": task_id
+                                }
+                            elif task_data.status.state == TaskState.failed:
+                                return {
+                                    "success": False,
+                                    "error": "Task failed",
+                                    "task_id": task_id
+                                }
+                
+                return {
+                    "success": False,
+                    "error": f"Task timed out after {timeout_seconds} seconds",
+                    "task_id": task_id
+                }
             
             # If it's a direct message response
             elif isinstance(result, Message):
+                response_text = ""
                 for part in result.parts:
                     if hasattr(part, 'root') and isinstance(part.root, TextPart):
-                        import json
-                        agent_data = json.loads(part.root.text)
-                        if agent_data.get("type") == "agent_list":
-                            return agent_data.get("agents", [])
+                        response_text = part.root.text
+                        break
+                
+                return {
+                    "success": True,
+                    "data": response_text
+                }
+            
+            else:
+                return {
+                    "success": False,
+                    "error": f"Unexpected result type: {type(result)}"
+                }
+        
+        return {
+            "success": False,
+            "error": "No result in response"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
+    """Get agent list from orchestrator via API call"""
+    try:
+        response = await send_orchestrator_command(httpx_client, orchestrator_url, "LIST_AGENTS", timeout_seconds=5)
+        
+        if response["success"]:
+            # Parse the JSON response
+            import json
+            agent_data = json.loads(response["data"])
+            if agent_data.get("type") == "agent_list":
+                return agent_data.get("agents", [])
+        else:
+            print(f"⚠️  Could not get agent list from orchestrator: {response.get('error', 'Unknown error')}")
         
         return []
     except Exception as e:
@@ -228,76 +292,20 @@ async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, 
     print(f"🔄 Registering agent {agent_url} with orchestrator {orchestrator_url}")
     
     try:
-        # Get orchestrator agent card
-        card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
-        card = await card_resolver.get_agent_card()
-        
-        # Create A2A client
-        client = A2AClient(httpx_client, agent_card=card)
-        
-        # Send registration request
-        message = Message(
-            role=Role.user,
-            parts=[Part(root=TextPart(text=f"REGISTER_AGENT:{agent_url}"))],
-            messageId=str(uuid4()),
-        )
-        
-        payload = MessageSendParams(
-            message=message,
-            configuration=MessageSendConfiguration(
-                acceptedOutputModes=["text"],
-            ),
-        )
-        
         print(f"📤 Sending registration request...")
-        response = await client.send_message(
-            SendMessageRequest(
-                id=str(uuid4()),
-                params=payload,
-            )
+        response = await send_orchestrator_command(
+            httpx_client, 
+            orchestrator_url, 
+            f"REGISTER_AGENT:{agent_url}", 
+            timeout_seconds=30,
+            poll_interval=1.0
         )
         
-        # Handle response
-        if hasattr(response, 'root') and hasattr(response.root, 'result'):
-            result = response.root.result
-            print(f"✅ Registration response received")
-            
-            # If it's a task, wait for completion
-            if isinstance(result, Task):
-                task_id = result.id
-                print(f"⏳ Waiting for task {task_id} to complete...")
-                
-                # Poll for completion
-                for _ in range(30):
-                    await asyncio.sleep(1)
-                    task_response = await client.get_task(
-                        GetTaskRequest(
-                            id=str(uuid4()),
-                            params=TaskQueryParams(id=task_id),
-                        )
-                    )
-                    
-                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
-                        task_data = task_response.root.result
-                        if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
-                            if task_data.status.state == TaskState.completed:
-                                print(f"🎉 Registration completed successfully!")
-                                if hasattr(task_data, 'artifacts') and task_data.artifacts:
-                                    for artifact in task_data.artifacts:
-                                        if hasattr(artifact, 'parts'):
-                                            for part in artifact.parts:
-                                                if hasattr(part, 'root') and isinstance(part.root, TextPart):
-                                                    print(f"📄 {part.root.text}")
-                                return
-                            elif task_data.status.state == TaskState.failed:
-                                print(f"❌ Registration failed")
-                                return
-                
-                print(f"⏰ Registration timed out")
-            else:
-                print(f"📄 Direct response: {result}")
+        if response["success"]:
+            print(f"🎉 Registration completed successfully!")
+            print(f"📄 {response['data']}")
         else:
-            print(f"❌ Unexpected response format")
+            print(f"❌ Registration failed: {response.get('error', 'Unknown error')}")
             
     except Exception as e:
         print(f"❌ Registration failed: {e}")
@@ -308,76 +316,20 @@ async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str
     print(f"🔄 Unregistering agent {agent_identifier} from orchestrator {orchestrator_url}")
     
     try:
-        # Get orchestrator agent card
-        card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
-        card = await card_resolver.get_agent_card()
-        
-        # Create A2A client
-        client = A2AClient(httpx_client, agent_card=card)
-        
-        # Send unregistration request
-        message = Message(
-            role=Role.user,
-            parts=[Part(root=TextPart(text=f"UNREGISTER_AGENT:{agent_identifier}"))],
-            messageId=str(uuid4()),
-        )
-        
-        payload = MessageSendParams(
-            message=message,
-            configuration=MessageSendConfiguration(
-                acceptedOutputModes=["text"],
-            ),
-        )
-        
         print(f"📤 Sending unregistration request...")
-        response = await client.send_message(
-            SendMessageRequest(
-                id=str(uuid4()),
-                params=payload,
-            )
+        response = await send_orchestrator_command(
+            httpx_client, 
+            orchestrator_url, 
+            f"UNREGISTER_AGENT:{agent_identifier}", 
+            timeout_seconds=30,
+            poll_interval=1.0
         )
         
-        # Handle response
-        if hasattr(response, 'root') and hasattr(response.root, 'result'):
-            result = response.root.result
-            print(f"✅ Unregistration response received")
-            
-            # If it's a task, wait for completion
-            if isinstance(result, Task):
-                task_id = result.id
-                print(f"⏳ Waiting for task {task_id} to complete...")
-                
-                # Poll for completion
-                for _ in range(30):
-                    await asyncio.sleep(1)
-                    task_response = await client.get_task(
-                        GetTaskRequest(
-                            id=str(uuid4()),
-                            params=TaskQueryParams(id=task_id),
-                        )
-                    )
-                    
-                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
-                        task_data = task_response.root.result
-                        if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
-                            if task_data.status.state == TaskState.completed:
-                                print(f"🎉 Unregistration completed successfully!")
-                                if hasattr(task_data, 'artifacts') and task_data.artifacts:
-                                    for artifact in task_data.artifacts:
-                                        if hasattr(artifact, 'parts'):
-                                            for part in artifact.parts:
-                                                if hasattr(part, 'root') and isinstance(part.root, TextPart):
-                                                    print(f"📄 {part.root.text}")
-                                return
-                            elif task_data.status.state == TaskState.failed:
-                                print(f"❌ Unregistration failed")
-                                return
-                
-                print(f"⏰ Unregistration timed out")
-            else:
-                print(f"📄 Direct response: {result}")
+        if response["success"]:
+            print(f"🎉 Unregistration completed successfully!")
+            print(f"📄 {response['data']}")
         else:
-            print(f"❌ Unexpected response format")
+            print(f"❌ Unregistration failed: {response.get('error', 'Unknown error')}")
             
     except Exception as e:
         print(f"❌ Unregistration failed: {e}")
@@ -415,7 +367,7 @@ async def orchestratorClient(
         
         # Handle list_agent flag
         if list_agent:
-            await display_available_agents(httpx_client, orchestrator, card)
+            await list_available_agents(httpx_client, orchestrator, card)
             return
         
         # Handle register_agent option
@@ -427,7 +379,7 @@ async def orchestratorClient(
             return
 
         # Default behavior: show available agents and continue with interactive mode
-        await display_available_agents(httpx_client, orchestrator, card)
+        await list_available_agents(httpx_client, orchestrator, card)
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
         notification_receiver_host = notif_receiver_parsed.hostname or "localhost"
