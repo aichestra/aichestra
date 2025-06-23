@@ -1,150 +1,193 @@
-#!/usr/bin/env python3
-"""Test client for Math Agent with MCP integration"""
+import logging
 
-import asyncio
-import json
-import httpx
+from typing import Any
 from uuid import uuid4
 
+import httpx
 
-async def test_math_agent():
-    """Test the math agent with various mathematical queries using MCP backend"""
-    
-    base_url = "http://localhost:8003"
-    
-    test_cases = [
-        "Calculate 2 + 2",
-        "What is the square root of 16?",
-        "Solve the equation x^2 - 4 = 0",
-        "Find the derivative of x^2 + 3x + 2",
-        "Calculate the integral of x^2",
-        "What is the determinant of [[1,2],[3,4]]?",
-        "Find the mean of [1,2,3,4,5]",
-        "What is sin(pi/4)?",
-        "Solve 2x + 5 = 11",
-        "Calculate the standard deviation of [10,12,14,16,18]"
-    ]
-    
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        print("🧮 Testing Math Agent (MCP-based)")
-        print("=" * 50)
-        
-        for i, query in enumerate(test_cases, 1):
-            print(f"\n{i}. Testing: {query}")
-            
-            # Create A2A JSON-RPC request
-            task_id = str(uuid4())
-            message_id = str(uuid4())
-            context_id = str(uuid4())
-            
-            payload = {
-                "jsonrpc": "2.0",
-                "id": str(uuid4()),
-                "method": "message/send",
-                "params": {
-                    "id": task_id,
-                    "message": {
-                        "role": "user",
-                        "messageId": message_id,
-                        "contextId": context_id,
-                        "parts": [
-                            {
-                                "type": "text",
-                                "text": query
-                            }
-                        ]
-                    },
-                    "configuration": {
-                        "acceptedOutputModes": ["text"]
+from a2a.client import A2ACardResolver, A2AClient
+from a2a.types import (
+    AgentCard,
+    MessageSendParams,
+    SendMessageRequest,
+    SendStreamingMessageRequest,
+)
+
+
+PUBLIC_AGENT_CARD_PATH = '/.well-known/agent.json'
+EXTENDED_AGENT_CARD_PATH = '/agent/authenticatedExtendedCard'
+
+
+async def main() -> None:
+    # Configure logging to show INFO level messages
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)  # Get a logger instance
+
+    # --8<-- [start:A2ACardResolver]
+
+    base_url = 'http://localhost:8003'
+
+    async with httpx.AsyncClient() as httpx_client:
+        # Initialize A2ACardResolver
+        resolver = A2ACardResolver(
+            httpx_client=httpx_client,
+            base_url=base_url,
+            # agent_card_path uses default, extended_agent_card_path also uses default
+        )
+        # --8<-- [end:A2ACardResolver]
+
+        # Fetch Public Agent Card and Initialize Client
+        final_agent_card_to_use: AgentCard | None = None
+
+        try:
+            logger.info(
+                f'Attempting to fetch public agent card from: {base_url}{PUBLIC_AGENT_CARD_PATH}'
+            )
+            _public_card = (
+                await resolver.get_agent_card()
+            )  # Fetches from default public path
+            logger.info('Successfully fetched public agent card:')
+            logger.info(
+                _public_card.model_dump_json(indent=2, exclude_none=True)
+            )
+            final_agent_card_to_use = _public_card
+            logger.info(
+                '\nUsing PUBLIC agent card for client initialization (default).'
+            )
+
+            if _public_card.supportsAuthenticatedExtendedCard:
+                try:
+                    logger.info(
+                        '\nPublic card supports authenticated extended card. '
+                        'Attempting to fetch from: '
+                        f'{base_url}{EXTENDED_AGENT_CARD_PATH}'
+                    )
+                    auth_headers_dict = {
+                        'Authorization': 'Bearer dummy-token-for-extended-card'
                     }
-                }
-            }
-            
-            try:
-                # Send request
-                response = await client.post(
-                    base_url,
-                    json=payload,
-                    headers={"Content-Type": "application/json"}
+                    _extended_card = await resolver.get_agent_card(
+                        relative_card_path=EXTENDED_AGENT_CARD_PATH,
+                        http_kwargs={'headers': auth_headers_dict},
+                    )
+                    logger.info(
+                        'Successfully fetched authenticated extended agent card:'
+                    )
+                    logger.info(
+                        _extended_card.model_dump_json(
+                            indent=2, exclude_none=True
+                        )
+                    )
+                    final_agent_card_to_use = (
+                        _extended_card  # Update to use the extended card
+                    )
+                    logger.info(
+                        '\nUsing AUTHENTICATED EXTENDED agent card for client '
+                        'initialization.'
+                    )
+                except Exception as e_extended:
+                    logger.warning(
+                        f'Failed to fetch extended agent card: {e_extended}. '
+                        'Will proceed with public card.',
+                        exc_info=True,
+                    )
+            elif (
+                _public_card
+            ):  # supportsAuthenticatedExtendedCard is False or None
+                logger.info(
+                    '\nPublic card does not indicate support for an extended card. Using public card.'
                 )
-                response.raise_for_status()
-                
-                result = response.json()
-                
-                if "error" in result:
-                    print(f"❌ Error: {result['error']}")
-                    continue
-                
-                # Handle task polling if needed
-                if "result" in result and isinstance(result["result"], dict):
-                    task_result = result["result"]
-                    
-                    if "id" in task_result and "status" in task_result:
-                        # Poll for completion
-                        task_id = task_result["id"]
-                        
-                        for attempt in range(10):
-                            await asyncio.sleep(0.5)
-                            
-                            get_payload = {
-                                "jsonrpc": "2.0",
-                                "id": str(uuid4()),
-                                "method": "tasks/get",
-                                "params": {
-                                    "id": task_id
-                                }
-                            }
-                            
-                            get_response = await client.post(
-                                base_url,
-                                json=get_payload,
-                                headers={"Content-Type": "application/json"}
-                            )
-                            get_response.raise_for_status()
-                            
-                            get_result = get_response.json()
-                            
-                            if "result" in get_result and get_result["result"]:
-                                task_data = get_result["result"]
-                                task_state = task_data.get("status", {}).get("state")
-                                
-                                if task_state == "completed":
-                                    # Extract response
-                                    status_message = task_data.get("status", {}).get("message", {})
-                                    if status_message and "parts" in status_message:
-                                        for part in status_message["parts"]:
-                                            if part.get("type") == "text":
-                                                print(f"✅ Response: {part.get('text', 'No text')}")
-                                                break
-                                    break
-                                elif task_state == "failed":
-                                    print("❌ Task failed")
-                                    break
-                                elif task_state == "input-required":
-                                    # Handle input-required state
-                                    status_message = task_data.get("status", {}).get("message", {})
-                                    if status_message and "parts" in status_message:
-                                        for part in status_message["parts"]:
-                                            if part.get("type") == "text":
-                                                print(f"✅ Response: {part.get('text', 'No text')}")
-                                                break
-                                    break
-                        else:
-                            print("⏰ Task timeout")
-                    
-                    elif "parts" in task_result:
-                        # Direct message response
-                        for part in task_result["parts"]:
-                            if part.get("type") == "text":
-                                print(f"✅ Response: {part.get('text', 'No text')}")
-                                break
-                
-            except Exception as e:
-                print(f"❌ Error: {str(e)}")
-        
-        print("\n" + "=" * 50)
-        print("🎯 Math Agent testing completed!")
+
+        except Exception as e:
+            logger.error(
+                f'Critical error fetching public agent card: {e}', exc_info=True
+            )
+            raise RuntimeError(
+                'Failed to fetch the public agent card. Cannot continue.'
+            ) from e
+
+        # --8<-- [start:send_message]
+        client = A2AClient(
+            httpx_client=httpx_client, agent_card=final_agent_card_to_use
+        )
+        logger.info('A2AClient initialized.')
+
+        send_message_payload: dict[str, Any] = {
+            'message': {
+                'role': 'user',
+                'parts': [
+                    {'kind': 'text', 'text': 'What is 1+2?'}
+                ],
+                'messageId': uuid4().hex,
+            },
+        }
+        request = SendMessageRequest(
+            id=str(uuid4()), params=MessageSendParams(**send_message_payload)
+        )
+
+        response = await client.send_message(request)
+        logger.info("Response received:")
+        logger.info(response.model_dump_json(indent=2, exclude_none=True))
+        # --8<-- [end:send_message]
+
+        # --8<-- [start:Multiturn]
+        send_message_payload_multiturn: dict[str, Any] = {
+            'message': {
+                'role': 'user',
+                'parts': [
+                    {
+                        'kind': 'text',
+                        'text': 'What is 6*?',
+                    }
+                ],
+                'messageId': uuid4().hex,
+            },
+        }
+        request = SendMessageRequest(
+            id=str(uuid4()),
+            params=MessageSendParams(**send_message_payload_multiturn),
+        )
+
+        response = await client.send_message(request)
+        logger.info("Multiturn response received:")
+        logger.info(response.model_dump_json(indent=2, exclude_none=True))
+
+        task_id = response.root.result.id
+        contextId = response.root.result.contextId
+
+        second_send_message_payload_multiturn: dict[str, Any] = {
+            'message': {
+                'role': 'user',
+                'parts': [{'kind': 'text', 'text': '6*7'}],
+                'messageId': uuid4().hex,
+                'taskId': task_id,
+                'contextId': contextId,
+            },
+        }
+
+        second_request = SendMessageRequest(
+            id=str(uuid4()),
+            params=MessageSendParams(**second_send_message_payload_multiturn),
+        )
+        second_response = await client.send_message(second_request)
+        logger.info("Second multiturn response received:")
+        logger.info(second_response.model_dump_json(indent=2, exclude_none=True))
+        # --8<-- [end:Multiturn]
+
+        # --8<-- [start:send_message_streaming]
+
+        streaming_request = SendStreamingMessageRequest(
+            id=str(uuid4()), params=MessageSendParams(**send_message_payload)
+        )
+
+        stream_response = client.send_message_streaming(streaming_request)
+
+        async for chunk in stream_response:
+            logger.info("Streaming chunk received:")
+            logger.info(chunk.model_dump_json(indent=2, exclude_none=True))
+        # --8<-- [end:send_message_streaming]
 
 
-if __name__ == "__main__":
-    asyncio.run(test_math_agent()) 
+if __name__ == '__main__':
+    import asyncio
+
+    asyncio.run(main())
