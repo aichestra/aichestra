@@ -1,0 +1,403 @@
+import asyncio
+import base64
+import os
+import urllib
+import httpx
+import json
+
+from uuid import uuid4
+
+import asyncclick as click
+
+from a2a.client import A2AClient, A2ACardResolver
+from a2a.types import (
+    Part,
+    TextPart,
+    FilePart,
+    FileWithBytes,
+    Task,
+    TaskState,
+    Message,
+    TaskStatusUpdateEvent,
+    TaskArtifactUpdateEvent,
+    MessageSendConfiguration,
+    SendMessageRequest,
+    SendStreamingMessageRequest,
+    MessageSendParams,
+    GetTaskRequest,
+    TaskQueryParams,
+    JSONRPCErrorResponse,
+)
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.push_notification_auth import PushNotificationReceiverAuth
+
+
+def format_ai_response(content):
+    """Format AI response for better readability."""
+    if isinstance(content, dict):
+        # Handle A2A task artifacts (from orchestrator)
+        if 'artifacts' in content:
+            artifacts = content.get('artifacts', [])
+            if artifacts:
+                for artifact in artifacts:
+                    parts = artifact.get('parts', [])
+                    for part in parts:
+                        if part.get('kind') == 'text':
+                            text = part.get('text', '')
+                            # Extract just the final answer from orchestrator response
+                            if '→' in text:
+                                # Split on → and take the part after it
+                                answer = text.split('→', 1)[-1].strip()
+                                print("\n" + "="*60)
+                                print("🤖 AI RESPONSE")
+                                print("="*60)
+                                print(answer)
+                                print("="*60)
+                                return True
+                            else:
+                                print("\n" + "="*60)
+                                print("🤖 AI RESPONSE")
+                                print("="*60)
+                                print(text)
+                                print("="*60)
+                                return True
+        
+        # Handle structured data
+        if 'content' in content:
+            ai_content = content['content']
+            if isinstance(ai_content, dict):
+                # Handle task list from planner
+                if 'tasks' in ai_content:
+                    print("\n" + "="*60)
+                    print("🤖 AI PLANNER RESPONSE")
+                    print("="*60)
+                    print(f"Original Query: {ai_content.get('original_query', 'N/A')}")
+                    print(f"Task Type: {ai_content.get('task_info', {}).get('task_type', 'N/A')}")
+                    print(f"Scope: {ai_content.get('task_info', {}).get('scope', 'N/A')}")
+                    print("\n📋 TASKS:")
+                    for task in ai_content.get('tasks', []):
+                        print(f"  • Task {task.get('id', 'N/A')}: {task.get('description', 'N/A')}")
+                        print(f"    Status: {task.get('status', 'N/A')}")
+                    print("="*60)
+                    return True
+                else:
+                    # Handle other structured content
+                    print("\n" + "="*60)
+                    print("🤖 AI RESPONSE")
+                    print("="*60)
+                    for key, value in ai_content.items():
+                        if key != 'content':  # Avoid nested content
+                            print(f"{key}: {value}")
+                    print("="*60)
+                    return True
+            elif isinstance(ai_content, str):
+                # Handle text content
+                print("\n" + "="*60)
+                print("🤖 AI RESPONSE")
+                print("="*60)
+                print(ai_content)
+                print("="*60)
+                return True
+    elif isinstance(content, str):
+        # Handle direct string content
+        print("\n" + "="*60)
+        print("🤖 AI RESPONSE")
+        print("="*60)
+        print(content)
+        print("="*60)
+        return True
+    
+    return False
+
+
+async def display_available_agents(httpx_client, agent_url: str, card):
+    """Display available agents if connecting to orchestrator"""
+    try:
+        # Check if this is the orchestrator by looking at the agent card
+        if "orchestrator" in card.name.lower() or "routing" in card.description.lower():
+            print("\n" + "="*60)
+            print("🤖 AVAILABLE AGENTS")
+            print("="*60)
+            
+            # Try to discover agents by checking common ports
+            agent_endpoints = [
+                ("ArgoCD Agent", "http://localhost:8001"),
+                ("Currency Agent", "http://localhost:8002"), 
+                ("Math Agent", "http://localhost:8003")
+            ]
+            
+            available_agents = []
+            for name, endpoint in agent_endpoints:
+                try:
+                    response = await httpx_client.get(f"{endpoint}/.well-known/agent.json", timeout=2.0)
+                    if response.status_code == 200:
+                        agent_data = response.json()
+                        available_agents.append({
+                            "name": agent_data.get("name", name),
+                            "description": agent_data.get("description", ""),
+                            "url": endpoint,
+                            "skills": agent_data.get("skills", [])
+                        })
+                except:
+                    # Agent not available
+                    pass
+            
+            if available_agents:
+                print(f"Found {len(available_agents)} available agents:")
+                for i, agent in enumerate(available_agents, 1):
+                    print(f"\n{i}. {agent['name']} ({agent['url']})")
+                    print(f"   Description: {agent['description']}")
+                    if agent['skills']:
+                        skills_text = ", ".join([skill.get('name', 'Unknown') for skill in agent['skills'][:3]])
+                        if len(agent['skills']) > 3:
+                            skills_text += f" (+{len(agent['skills'])-3} more)"
+                        print(f"   Skills: {skills_text}")
+                print("\n" + "="*60)
+                print("💡 The orchestrator will automatically route your requests to the best agent!")
+            else:
+                print("⚠️  No agents currently available")
+            print("="*60)
+    except Exception as e:
+        # Silently fail if we can't get agent info
+        pass
+
+
+@click.command()
+@click.option("--agent", default="http://localhost:10000")
+@click.option("--session", default=0)
+@click.option("--history", default=False)
+@click.option("--use_push_notifications", default=False)
+@click.option("--push_notification_receiver", default="http://localhost:5000")
+@click.option("--header", multiple=True)
+async def orchestratorClient(
+    agent,
+    session,
+    history,
+    use_push_notifications: bool,
+    push_notification_receiver: str,
+    header,
+):
+    headers = {h.split("=")[0]: h.split("=")[1] for h in header}
+    print(f"Will use headers: {headers}")
+    async with httpx.AsyncClient(timeout=30, headers=headers) as httpx_client:
+        card_resolver = A2ACardResolver(httpx_client, agent)
+        card = await card_resolver.get_agent_card()
+
+        print("======= Agent Card ========")
+        print(card.model_dump_json(exclude_none=True))
+        
+        # Try to get available agents information from orchestrator
+        await display_available_agents(httpx_client, agent, card)
+
+        notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
+        notification_receiver_host = notif_receiver_parsed.hostname
+        notification_receiver_port = notif_receiver_parsed.port
+
+        if use_push_notifications:
+            from utils.push_notification_listener import (
+                PushNotificationListener,
+            )
+
+            notification_receiver_auth = PushNotificationReceiverAuth()
+            await notification_receiver_auth.load_jwks(f"{agent}/.well-known/jwks.json")
+
+            push_notification_listener = PushNotificationListener(
+                host=notification_receiver_host,
+                port=notification_receiver_port,
+                notification_receiver_auth=notification_receiver_auth,
+            )
+            push_notification_listener.start()
+
+        client = A2AClient(httpx_client, agent_card=card)
+
+        continue_loop = True
+        streaming = card.capabilities.streaming
+        context_id = session if session > 0 else uuid4().hex
+
+        while continue_loop:
+            print("=========  starting a new task ======== ")
+            continue_loop, _, taskId = await completeTask(
+                client,
+                streaming,
+                use_push_notifications,
+                notification_receiver_host,
+                notification_receiver_port,
+                None,
+                context_id,
+            )
+
+            if history and continue_loop:
+                print("========= history ======== ")
+                task_response = await client.get_task(
+                    {"id": taskId, "historyLength": 10}
+                )
+                print(
+                    task_response.model_dump_json(include={"result": {"history": True}})
+                )
+
+
+async def completeTask(
+    client: A2AClient,
+    streaming,
+    use_push_notifications: bool,
+    notification_receiver_host: str,
+    notification_receiver_port: int,
+    taskId,
+    contextId,
+):
+    prompt = click.prompt(
+        "\nWhat do you want to send to the agent? (:q or quit to exit)"
+    )
+    if prompt == ":q" or prompt == "quit":
+        return False, None, None
+
+    message = Message(
+        role="user",
+        parts=[TextPart(text=prompt)],
+        messageId=str(uuid4()),
+        taskId=taskId,
+        contextId=contextId,
+    )
+
+    file_path = click.prompt(
+        "Select a file path to attach? (press enter to skip)",
+        default="",
+        show_default=False,
+    )
+    if file_path and file_path.strip() != "":
+        with open(file_path, "rb") as f:
+            file_content = base64.b64encode(f.read()).decode("utf-8")
+            file_name = os.path.basename(file_path)
+
+        message.parts.append(
+            Part(root=FilePart(file=FileWithBytes(name=file_name, bytes=file_content)))
+        )
+
+    payload = MessageSendParams(
+        id=str(uuid4()),
+        message=message,
+        configuration=MessageSendConfiguration(
+            acceptedOutputModes=["text"],
+        ),
+    )
+
+    if use_push_notifications:
+        payload["pushNotification"] = {
+            "url": f"http://{notification_receiver_host}:{notification_receiver_port}/notify",
+            "authentication": {
+                "schemes": ["bearer"],
+            },
+        }
+
+    taskResult = None
+    message = None
+    if streaming:
+        response_stream = client.send_message_streaming(
+            SendStreamingMessageRequest(
+                id=str(uuid4()),
+                params=payload,
+            )
+        )
+        async for result in response_stream:
+            if isinstance(result.root, JSONRPCErrorResponse):
+                print("Error: ", result.root.error)
+                return False, contextId, taskId
+            event = result.root.result
+            contextId = event.contextId
+            if isinstance(event, Task):
+                taskId = event.id
+            elif isinstance(event, TaskStatusUpdateEvent) or isinstance(
+                event, TaskArtifactUpdateEvent
+            ):
+                taskId = event.taskId
+            elif isinstance(event, Message):
+                message = event
+            print(f"stream event => {event.model_dump_json(exclude_none=True)}")
+        # Upon completion of the stream. Retrieve the full task if one was made.
+        if taskId:
+            taskResult = await client.get_task(
+                GetTaskRequest(
+                    id=str(uuid4()),
+                    params=TaskQueryParams(id=taskId),
+                )
+            )
+            taskResult = taskResult.root.result
+    else:
+        try:
+            # For non-streaming, assume the response is a task or message.
+            event = await client.send_message(
+                SendMessageRequest(
+                    id=str(uuid4()),
+                    params=payload,
+                )
+            )
+            event = event.root.result
+        except Exception as e:
+            print("Failed to complete the call", e)
+        if not contextId:
+            contextId = event.contextId
+        if isinstance(event, Task):
+            if not taskId:
+                taskId = event.id
+            taskResult = event
+        elif isinstance(event, Message):
+            message = event
+
+    if message:
+        # Try to format AI response for readability
+        message_content = message.model_dump_json(exclude_none=True)
+        try:
+            content_data = json.loads(message_content)
+            if not format_ai_response(content_data):
+                print(f"\n{message_content}")
+        except:
+            print(f"\n{message_content}")
+        return True, contextId, taskId
+    if taskResult:
+        # Try to format AI response for readability
+        task_content = taskResult.model_dump_json(
+            exclude={
+                "history": {
+                    "__all__": {
+                        "parts": {
+                            "__all__": {"file"},
+                        },
+                    },
+                },
+            },
+            exclude_none=True,
+        )
+        
+        try:
+            content_data = json.loads(task_content)
+            if not format_ai_response(content_data):
+                print(f"\n{task_content}")
+        except:
+            print(f"\n{task_content}")
+        
+        ## if the result is that more input is required, loop again.
+        state = TaskState(taskResult.status.state)
+        if state.name == TaskState.input_required.name:
+            return (
+                await completeTask(
+                    client,
+                    streaming,
+                    use_push_notifications,
+                    notification_receiver_host,
+                    notification_receiver_port,
+                    taskId,
+                    contextId,
+                ),
+                contextId,
+                taskId,
+            )
+        ## task is complete
+        return True, contextId, taskId
+    ## Failure case, shouldn't reach
+    return True, contextId, taskId
+
+
+if __name__ == "__main__":
+    asyncio.run(orchestratorClient())
