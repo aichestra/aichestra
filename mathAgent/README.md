@@ -149,6 +149,8 @@ The Math Agent includes **8 comprehensive test files** covering all aspects of f
 cd mathAgent
 uv run python test/simple_test.py
 
+uv run python -m app.test_client
+
 # Comprehensive MCP + LLM test
 uv run python test/comprehensive_test.py
 
