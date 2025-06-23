@@ -305,6 +305,7 @@ async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, 
 
 @click.command()
 @click.option("--orchestrator", default="http://localhost:8000")
+@click.option("--list_agent", is_flag=True, help="List all available agents from orchestrator")
 @click.option("--register_agent", default="")
 @click.option("--session", default=0)
 @click.option("--history", default=False)
@@ -313,6 +314,7 @@ async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, 
 @click.option("--header", multiple=True)
 async def orchestratorClient(
     orchestrator,
+    list_agent,
     register_agent,
     session,
     history,
@@ -329,12 +331,18 @@ async def orchestratorClient(
         print("======= Agent Card ========")
         print(card.model_dump_json(exclude_none=True))
         
-        # Try to get available agents information from orchestrator
-        await display_available_agents(httpx_client, orchestrator, card)
+        # Handle list_agent flag
+        if list_agent:
+            await display_available_agents(httpx_client, orchestrator, card)
+            return
         
+        # Handle register_agent option
         if register_agent != "":
             await register_agent_with_orchestrator(httpx_client, orchestrator, register_agent)
             return
+
+        # Default behavior: show available agents and continue with interactive mode
+        await display_available_agents(httpx_client, orchestrator, card)
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
         notification_receiver_host = notif_receiver_parsed.hostname or "localhost"
