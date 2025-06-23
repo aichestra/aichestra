@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_orchestrator_agent_card() -> AgentCard:
+def create_orchestrator_agent_card(host: str, port: int) -> AgentCard:
     """Create the orchestrator agent card"""
     skills = [
         AgentSkill(
@@ -58,7 +58,7 @@ def create_orchestrator_agent_card() -> AgentCard:
     return AgentCard(
         name="Smart Orchestrator Agent",
         description="Intelligent agent that routes requests to specialized agents using LangGraph and A2A protocol",
-        url="http://localhost:8000",
+        url=f"http://{host}:{port}/",
         version="1.0.0",
         capabilities=capabilities,
         skills=skills,
@@ -78,39 +78,7 @@ def main(host: str, port: int):
     try:
         from app.agent_executor import OrchestratorAgentExecutor
         
-        capabilities = AgentCapabilities(streaming=False, pushNotifications=True)
-        
-        skills = [
-            AgentSkill(
-                id="request_routing",
-                name="Request Routing",
-                description="Intelligent request routing to specialized agents",
-                tags=["routing", "orchestration"]
-            ),
-            AgentSkill(
-                id="agent_coordination", 
-                name="Agent Coordination",
-                description="Multi-agent system coordination and management",
-                tags=["coordination", "management"]
-            ),
-            AgentSkill(
-                id="skill_matching",
-                name="Skill Matching", 
-                description="Skill-based agent selection and matching",
-                tags=["matching", "selection"]
-            )
-        ]
-        
-        agent_card = AgentCard(
-            name="Smart Orchestrator Agent",
-            description="Intelligent agent that routes requests to specialized agents using LangGraph",
-            url=f"http://{host}:{port}/",
-            version="1.0.0",
-            defaultInputModes=["text"],
-            defaultOutputModes=["text"],
-            capabilities=capabilities,
-            skills=skills,
-        )
+        agent_card = create_orchestrator_agent_card(host, port)
 
         # Create the A2A server
         httpx_client = httpx.AsyncClient()
