@@ -1,10 +1,9 @@
 import asyncio
 import base64
 import os
-import urllib
+import urllib.parse
 import httpx
 import json
-
 from uuid import uuid4
 
 import asyncclick as click
@@ -18,6 +17,7 @@ from a2a.types import (
     Task,
     TaskState,
     Message,
+    Role,
     TaskStatusUpdateEvent,
     TaskArtifactUpdateEvent,
     MessageSendConfiguration,
@@ -155,8 +155,8 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
         
         # Send LIST_AGENTS request
         message = Message(
-            role="user",
-            parts=[TextPart(text="LIST_AGENTS")],
+            role=Role.user,
+            parts=[Part(root=TextPart(text="LIST_AGENTS"))],
             messageId=str(uuid4()),
         )
         
@@ -200,7 +200,7 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
                                     for artifact in task_data.artifacts:
                                         if hasattr(artifact, 'parts'):
                                             for part in artifact.parts:
-                                                if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                                                if hasattr(part, 'root') and isinstance(part.root, TextPart):
                                                     # Parse the JSON response
                                                     import json
                                                     agent_data = json.loads(part.root.text)
@@ -211,7 +211,7 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
             # If it's a direct message response
             elif isinstance(result, Message):
                 for part in result.parts:
-                    if hasattr(part, 'root') and hasattr(part.root, 'text'):
+                    if hasattr(part, 'root') and isinstance(part.root, TextPart):
                         import json
                         agent_data = json.loads(part.root.text)
                         if agent_data.get("type") == "agent_list":
@@ -223,8 +223,89 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
         return []
 
 
+async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, agent_url: str):
+    """Register an agent with the orchestrator"""
+    print(f"🔄 Registering agent {agent_url} with orchestrator {orchestrator_url}")
+    
+    try:
+        # Get orchestrator agent card
+        card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
+        card = await card_resolver.get_agent_card()
+        
+        # Create A2A client
+        client = A2AClient(httpx_client, agent_card=card)
+        
+        # Send registration request
+        message = Message(
+            role=Role.user,
+            parts=[Part(root=TextPart(text=f"REGISTER_AGENT:{agent_url}"))],
+            messageId=str(uuid4()),
+        )
+        
+        payload = MessageSendParams(
+            message=message,
+            configuration=MessageSendConfiguration(
+                acceptedOutputModes=["text"],
+            ),
+        )
+        
+        print(f"📤 Sending registration request...")
+        response = await client.send_message(
+            SendMessageRequest(
+                id=str(uuid4()),
+                params=payload,
+            )
+        )
+        
+        # Handle response
+        if hasattr(response, 'root') and hasattr(response.root, 'result'):
+            result = response.root.result
+            print(f"✅ Registration response received")
+            
+            # If it's a task, wait for completion
+            if isinstance(result, Task):
+                task_id = result.id
+                print(f"⏳ Waiting for task {task_id} to complete...")
+                
+                # Poll for completion
+                for _ in range(30):
+                    await asyncio.sleep(1)
+                    task_response = await client.get_task(
+                        GetTaskRequest(
+                            id=str(uuid4()),
+                            params=TaskQueryParams(id=task_id),
+                        )
+                    )
+                    
+                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
+                        task_data = task_response.root.result
+                        if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
+                            if task_data.status.state == TaskState.completed:
+                                print(f"🎉 Registration completed successfully!")
+                                if hasattr(task_data, 'artifacts') and task_data.artifacts:
+                                    for artifact in task_data.artifacts:
+                                        if hasattr(artifact, 'parts'):
+                                            for part in artifact.parts:
+                                                if hasattr(part, 'root') and isinstance(part.root, TextPart):
+                                                    print(f"📄 {part.root.text}")
+                                return
+                            elif task_data.status.state == TaskState.failed:
+                                print(f"❌ Registration failed")
+                                return
+                
+                print(f"⏰ Registration timed out")
+            else:
+                print(f"📄 Direct response: {result}")
+        else:
+            print(f"❌ Unexpected response format")
+            
+    except Exception as e:
+        print(f"❌ Registration failed: {e}")
+
+
 @click.command()
-@click.option("--orchestrator", default="http://localhost:80000")
+@click.option("--orchestrator", default="http://localhost:8000")
+@click.option("--register_agent", default="")
 @click.option("--session", default=0)
 @click.option("--history", default=False)
 @click.option("--use_push_notifications", default=False)
@@ -232,6 +313,7 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
 @click.option("--header", multiple=True)
 async def orchestratorClient(
     orchestrator,
+    register_agent,
     session,
     history,
     use_push_notifications: bool,
@@ -249,10 +331,14 @@ async def orchestratorClient(
         
         # Try to get available agents information from orchestrator
         await display_available_agents(httpx_client, orchestrator, card)
+        
+        if register_agent != "":
+            await register_agent_with_orchestrator(httpx_client, orchestrator, register_agent)
+            return
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
-        notification_receiver_host = notif_receiver_parsed.hostname
-        notification_receiver_port = notif_receiver_parsed.port
+        notification_receiver_host = notif_receiver_parsed.hostname or "localhost"
+        notification_receiver_port = notif_receiver_parsed.port or 5000
 
         if use_push_notifications:
             from utils.push_notification_listener import (
@@ -290,7 +376,10 @@ async def orchestratorClient(
             if history and continue_loop:
                 print("========= history ======== ")
                 task_response = await client.get_task(
-                    {"id": taskId, "historyLength": 10}
+                    GetTaskRequest(
+                        id=str(uuid4()),
+                        params=TaskQueryParams(id=taskId or "", historyLength=10),
+                    )
                 )
                 print(
                     task_response.model_dump_json(include={"result": {"history": True}})
@@ -313,8 +402,8 @@ async def completeTask(
         return False, None, None
 
     message = Message(
-        role="user",
-        parts=[TextPart(text=prompt)],
+        role=Role.user,
+        parts=[Part(root=TextPart(text=prompt))],
         messageId=str(uuid4()),
         taskId=taskId,
         contextId=contextId,
@@ -335,7 +424,6 @@ async def completeTask(
         )
 
     payload = MessageSendParams(
-        id=str(uuid4()),
         message=message,
         configuration=MessageSendConfiguration(
             acceptedOutputModes=["text"],
@@ -343,15 +431,11 @@ async def completeTask(
     )
 
     if use_push_notifications:
-        payload["pushNotification"] = {
-            "url": f"http://{notification_receiver_host}:{notification_receiver_port}/notify",
-            "authentication": {
-                "schemes": ["bearer"],
-            },
-        }
+        # Note: This is a simplified version; proper implementation would need to handle push notifications
+        pass
 
     taskResult = None
-    message = None
+    response_message = None
     if streaming:
         response_stream = client.send_message_streaming(
             SendStreamingMessageRequest(
@@ -372,7 +456,7 @@ async def completeTask(
             ):
                 taskId = event.taskId
             elif isinstance(event, Message):
-                message = event
+                response_message = event
             print(f"stream event => {event.model_dump_json(exclude_none=True)}")
         # Upon completion of the stream. Retrieve the full task if one was made.
         if taskId:
@@ -402,11 +486,11 @@ async def completeTask(
                 taskId = event.id
             taskResult = event
         elif isinstance(event, Message):
-            message = event
+            response_message = event
 
-    if message:
+    if response_message:
         # Try to format AI response for readability
-        message_content = message.model_dump_json(exclude_none=True)
+        message_content = response_message.model_dump_json(exclude_none=True)
         try:
             content_data = json.loads(message_content)
             if not format_ai_response(content_data):
@@ -459,4 +543,4 @@ async def completeTask(
 
 
 if __name__ == "__main__":
-    asyncio.run(orchestratorClient())
+    orchestratorClient()

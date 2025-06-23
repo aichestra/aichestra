@@ -82,6 +82,65 @@ class OrchestratorAgentExecutor(AgentExecutor):
                     "agents": agents,
                     "total_count": len(agents)
                 }, indent=2)
+            
+            # Check if this is a registration request
+            elif query.startswith("REGISTER_AGENT:"):
+                endpoint = query.replace("REGISTER_AGENT:", "").strip()
+                logger.info(f"Registering agent from endpoint: {endpoint}")
+                
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        f"Registering agent from {endpoint}...",
+                        task.contextId,
+                        task.id,
+                    ),
+                )
+                
+                # Register the agent
+                result = await self.orchestrator.register_agent(endpoint)
+                logger.info(f"Registration result: {result}")
+                
+                if result.get("success", False):
+                    # Log all registered agent details after successful registration
+                    logger.info("=" * 80)
+                    logger.info("🎉 AGENT REGISTRATION SUCCESSFUL - ALL REGISTERED AGENTS:")
+                    logger.info("=" * 80)
+                    
+                    for agent_id, agent_card in self.orchestrator.agents.items():
+                        logger.info(f"Agent ID: {agent_id}")
+                        logger.info(f"  Name: {agent_card.name}")
+                        logger.info(f"  Endpoint: {agent_card.url}")
+                        logger.info(f"  Description: {agent_card.description}")
+                        
+                        # Log skills if available
+                        if agent_card.skills:
+                            logger.info(f"  Skills ({len(agent_card.skills)}):")
+                            for skill in agent_card.skills:
+                                logger.info(f"    • {skill.name}: {skill.description}")
+                                if skill.tags:
+                                    logger.info(f"      Tags: {', '.join(skill.tags)}")
+                        else:
+                            logger.info("  Skills: None")
+                        
+                        # Log capabilities if available
+                        capabilities = agent_card.capabilities
+                        logger.info(f"  Capabilities:")
+                        logger.info(f"    • Streaming: {capabilities.streaming}")
+                        logger.info(f"    • Push Notifications: {capabilities.pushNotifications}")
+                        logger.info(f"    • State Transition History: {capabilities.stateTransitionHistory}")
+                        
+                        logger.info("-" * 40)
+                    
+                    logger.info(f"Total registered agents: {len(self.orchestrator.agents)}")
+                    logger.info("=" * 80)
+                    
+                    response_text = f"✅ {result.get('message')}\n"
+                    response_text += f"Agent ID: {result.get('agent_id')}\n"
+                    response_text += f"Agent Name: {result.get('agent_name')}\n"
+                    response_text += f"Total agents: {len(self.orchestrator.agents)}"
+                else:
+                    response_text = f"❌ Registration failed: {result.get('error')}"
                 
             else:
                 # Process the request through the orchestrator
