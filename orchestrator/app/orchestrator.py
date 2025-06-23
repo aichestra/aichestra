@@ -27,6 +27,7 @@ class SmartOrchestrator:
     
     def __init__(self):
         self.agents: Dict[str, AgentCard] = {}
+        self.skill_keywords: Dict[str, List[str]] = {}
         self.workflow = self._create_workflow()
         self._initialize_default_agents()
     
@@ -34,11 +35,11 @@ class SmartOrchestrator:
         """Initialize default agents by fetching their agent cards using A2A client"""
         
         # Default agent endpoints
-        default_agents = {
+        default_agents = [
             "http://localhost:8001",
             "http://localhost:8002",
             "http://localhost:8003"
-        }
+        ]
         
         # Fetch agent cards using A2A client - run async initialization
         asyncio.run(self._fetch_all_agent_cards(default_agents))
@@ -56,6 +57,9 @@ class SmartOrchestrator:
                         print(f"⚠️  Failed to load agent card from {endpoint}")
                 except Exception as e:
                     print(f"❌ Error loading agent from {endpoint}: {e}")
+        
+        # Update skill keywords after loading all default agents
+        self._update_skill_keywords()
     
     async def _fetch_agent_card_with_a2a(self, httpx_client: httpx.AsyncClient, endpoint: str) -> Optional[AgentCard]:
         """Fetch agent card using A2A client"""
@@ -77,6 +81,40 @@ class SmartOrchestrator:
     def add_agent(self, agent_id: str, agent_card: AgentCard):
         """Add a new agent using A2A SDK AgentCard"""
         self.agents[agent_id] = agent_card
+        self._update_skill_keywords()
+    
+    def _update_skill_keywords(self):
+        """Update skill keywords based on currently available agents"""
+        self.skill_keywords = {}
+        
+        for agent_id, agent_card in self.agents.items():
+            for skill in agent_card.skills:
+                skill_name = skill.name
+                
+                # Initialize skill keywords list if not exists
+                if skill_name not in self.skill_keywords:
+                    self.skill_keywords[skill_name] = []
+                
+                # Add tags from this skill as keywords
+                if skill.tags:
+                    for tag in skill.tags:
+                        if tag.lower() not in [kw.lower() for kw in self.skill_keywords[skill_name]]:
+                            self.skill_keywords[skill_name].append(tag.lower())
+                
+                # Add skill name itself as a keyword
+                skill_name_lower = skill_name.lower().replace("_", " ")
+                if skill_name_lower not in [kw.lower() for kw in self.skill_keywords[skill_name]]:
+                    self.skill_keywords[skill_name].append(skill_name_lower)
+                
+                # Add description words as keywords (first 3 words)
+                if skill.description:
+                    desc_words = skill.description.lower().split()[:3]
+                    for word in desc_words:
+                        # Only add meaningful words (length > 2)
+                        if len(word) > 2 and word not in [kw.lower() for kw in self.skill_keywords[skill_name]]:
+                            self.skill_keywords[skill_name].append(word)
+        
+        print(f"Updated skill keywords for {len(self.skill_keywords)} skills from {len(self.agents)} agents")
     
     async def register_agent(self, endpoint: str) -> Dict:
         """Register a new agent by fetching its agent card from the endpoint"""
@@ -89,6 +127,7 @@ class SmartOrchestrator:
                     
                     # Add the agent to our registry
                     self.agents[agent_id] = agent_card
+                    self._update_skill_keywords()
                     
                     return {
                         "success": True,
@@ -140,6 +179,7 @@ class SmartOrchestrator:
             if agent_to_remove and agent_id_to_remove:
                 # Remove the agent from registry
                 del self.agents[agent_id_to_remove]
+                self._update_skill_keywords()
                 
                 return {
                     "success": True,
@@ -296,27 +336,9 @@ class SmartOrchestrator:
         return score, matched_skills
     
     def _skill_matches_request(self, skill_name: str, request: str) -> bool:
-        """Check if a skill matches the request content"""
-        skill_keywords = {
-            "kubernetes_management": ["kubernetes", "k8s", "cluster", "pod", "service", "namespace"],
-            "gitops": ["gitops", "git", "deploy", "deployment", "sync"],
-            "application_deployment": ["deploy", "deployment", "application", "app", "release"],
-            "argocd_operations": ["argocd", "argo", "sync", "application"],
-            "sync_operations": ["sync", "synchronize", "update", "refresh"],
-            "resource_monitoring": ["status", "health", "monitor", "resource"],
-            "currency_exchange": ["currency", "exchange", "convert", "rate", "usd", "eur", "inr", "gbp", "jpy", "cad", "aud", "chf", "cny", "dollar", "euro", "rupee", "pound", "yen"],
-            "financial_data": ["financial", "money", "price", "cost", "usd", "eur", "inr", "dollar"],
-            "market_analysis": ["market", "analysis", "trend", "bitcoin", "crypto"],
-            "rate_conversion": ["convert", "conversion", "rate", "exchange", "usd", "eur", "inr", "dollar"],
-            "historical_data": ["historical", "history", "past", "data"],
-            "arithmetic_calculation": ["math", "calculation", "arithmetic", "compute", "calculate", "add", "subtract", "multiply", "divide", "power", "sqrt", "sin", "cos", "tan", "log", "exp", "what is", "plus", "minus", "times", "+", "-", "*", "/", "^", "sum", "product", "number", "numbers"],
-            "equation_solving": ["equation", "solve", "algebra", "polynomial", "quadratic", "linear", "system", "roots", "solutions"],
-            "calculus_operations": ["calculus", "derivative", "integral", "differentiate", "integrate", "limit", "function", "dx", "dy"],
-            "matrix_operations": ["matrix", "linear", "algebra", "determinant", "inverse", "transpose", "multiply", "eigenvalue", "vector"],
-            "statistics_analysis": ["statistics", "stats", "mean", "median", "mode", "standard", "deviation", "variance", "data", "analysis"]
-        }
-        
-        keywords = skill_keywords.get(skill_name, [])
+        """Check if a skill matches the request content using dynamic keywords from available agents"""
+        # Get keywords for this skill from the dynamically built skill_keywords
+        keywords = self.skill_keywords.get(skill_name, [])
         request_lower = request.lower()
         
         return any(keyword in request_lower for keyword in keywords)
