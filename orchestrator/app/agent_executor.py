@@ -145,6 +145,49 @@ class OrchestratorAgentExecutor(AgentExecutor):
                     response_text += f"Total agents: {len(self.orchestrator.agents)}"
                 else:
                     response_text = f"❌ Registration failed: {result.get('error')}"
+            
+            # Check if this is an unregistration request
+            elif query.startswith("UNREGISTER_AGENT:"):
+                agent_identifier = query.replace("UNREGISTER_AGENT:", "").strip()
+                logger.info(f"Unregistering agent: {agent_identifier}")
+                
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        f"Unregistering agent {agent_identifier}...",
+                        task.contextId,
+                        task.id,
+                    ),
+                )
+                
+                # Unregister the agent
+                result = await self.orchestrator.unregister_agent(agent_identifier)
+                logger.info(f"Unregistration result: {result}")
+                
+                if result.get("success", False):
+                    # Log all registered agent details after successful unregistration
+                    logger.info("=" * 80)
+                    logger.info("🗑️  AGENT UNREGISTRATION SUCCESSFUL - REMAINING REGISTERED AGENTS:")
+                    logger.info("=" * 80)
+                    
+                    if self.orchestrator.agents:
+                        for agent_id, agent_card in self.orchestrator.agents.items():
+                            logger.info(f"Agent ID: {agent_id}")
+                            logger.info(f"  Name: {agent_card.name}")
+                            logger.info(f"  Endpoint: {agent_card.url}")
+                            logger.info(f"  Description: {agent_card.description}")
+                            logger.info("-" * 40)
+                    else:
+                        logger.info("No agents remaining in registry")
+                    
+                    logger.info(f"Total remaining agents: {len(self.orchestrator.agents)}")
+                    logger.info("=" * 80)
+                    
+                    response_text = f"✅ {result.get('message')}\n"
+                    response_text += f"Agent ID: {result.get('agent_id')}\n"
+                    response_text += f"Remaining agents: {len(self.orchestrator.agents)}"
+                else:
+                    response_text = f"❌ Unregistration failed: {result.get('error')}"
                 
             else:
                 # Process the request through the orchestrator

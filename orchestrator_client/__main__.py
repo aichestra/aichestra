@@ -303,10 +303,91 @@ async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, 
         print(f"❌ Registration failed: {e}")
 
 
+async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str, agent_identifier: str):
+    """Unregister an agent from the orchestrator"""
+    print(f"🔄 Unregistering agent {agent_identifier} from orchestrator {orchestrator_url}")
+    
+    try:
+        # Get orchestrator agent card
+        card_resolver = A2ACardResolver(httpx_client, orchestrator_url)
+        card = await card_resolver.get_agent_card()
+        
+        # Create A2A client
+        client = A2AClient(httpx_client, agent_card=card)
+        
+        # Send unregistration request
+        message = Message(
+            role=Role.user,
+            parts=[Part(root=TextPart(text=f"UNREGISTER_AGENT:{agent_identifier}"))],
+            messageId=str(uuid4()),
+        )
+        
+        payload = MessageSendParams(
+            message=message,
+            configuration=MessageSendConfiguration(
+                acceptedOutputModes=["text"],
+            ),
+        )
+        
+        print(f"📤 Sending unregistration request...")
+        response = await client.send_message(
+            SendMessageRequest(
+                id=str(uuid4()),
+                params=payload,
+            )
+        )
+        
+        # Handle response
+        if hasattr(response, 'root') and hasattr(response.root, 'result'):
+            result = response.root.result
+            print(f"✅ Unregistration response received")
+            
+            # If it's a task, wait for completion
+            if isinstance(result, Task):
+                task_id = result.id
+                print(f"⏳ Waiting for task {task_id} to complete...")
+                
+                # Poll for completion
+                for _ in range(30):
+                    await asyncio.sleep(1)
+                    task_response = await client.get_task(
+                        GetTaskRequest(
+                            id=str(uuid4()),
+                            params=TaskQueryParams(id=task_id),
+                        )
+                    )
+                    
+                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
+                        task_data = task_response.root.result
+                        if hasattr(task_data, 'status') and hasattr(task_data.status, 'state'):
+                            if task_data.status.state == TaskState.completed:
+                                print(f"🎉 Unregistration completed successfully!")
+                                if hasattr(task_data, 'artifacts') and task_data.artifacts:
+                                    for artifact in task_data.artifacts:
+                                        if hasattr(artifact, 'parts'):
+                                            for part in artifact.parts:
+                                                if hasattr(part, 'root') and isinstance(part.root, TextPart):
+                                                    print(f"📄 {part.root.text}")
+                                return
+                            elif task_data.status.state == TaskState.failed:
+                                print(f"❌ Unregistration failed")
+                                return
+                
+                print(f"⏰ Unregistration timed out")
+            else:
+                print(f"📄 Direct response: {result}")
+        else:
+            print(f"❌ Unexpected response format")
+            
+    except Exception as e:
+        print(f"❌ Unregistration failed: {e}")
+
+
 @click.command()
 @click.option("--orchestrator", default="http://localhost:8000")
 @click.option("--list_agent", is_flag=True, help="List all available agents from orchestrator")
 @click.option("--register_agent", default="")
+@click.option("--unregister_agent", default="")
 @click.option("--session", default=0)
 @click.option("--history", default=False)
 @click.option("--use_push_notifications", default=False)
@@ -316,6 +397,7 @@ async def orchestratorClient(
     orchestrator,
     list_agent,
     register_agent,
+    unregister_agent,
     session,
     history,
     use_push_notifications: bool,
@@ -339,6 +421,9 @@ async def orchestratorClient(
         # Handle register_agent option
         if register_agent != "":
             await register_agent_with_orchestrator(httpx_client, orchestrator, register_agent)
+            return
+        if unregister_agent != "":
+            await unregister_agent_with_orchestrator(httpx_client, orchestrator, unregister_agent)
             return
 
         # Default behavior: show available agents and continue with interactive mode
