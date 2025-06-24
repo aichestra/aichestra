@@ -1,11 +1,90 @@
-# 🤖 A2A Orchestrator Agent
+# 🤖 Smart Orchestrator - Intelligent Agent Routing System
 
-An intelligent orchestrator agent built with **LangGraph** and **A2A Protocol** that automatically routes user requests to specialized agents (ArgoCD, Currency, etc.) using skill-based matching and confidence scoring.
+An intelligent orchestrator agent built with **LangGraph** and **A2A Protocol** that automatically routes user requests to the best available specialized agent using dynamic capability discovery and skill-based matching.
+
+## 🚀 **Key Features**
+
+The orchestrator provides **intelligent single-agent routing** for optimal request handling:
+
+### Dynamic Agent Discovery
+```
+Agent Registration → AgentCard Analysis → Skill Extraction → Capability Registry
+```
+
+### Intelligent Routing
+```
+"Convert 100 USD to EUR" → Currency Agent (100% confidence)
+"What is 2+3?" → Math Agent (95% confidence)
+"List applications" → ArgoCD Agent (100% confidence)
+```
+
+## 🏗️ Architecture
+
+The orchestrator uses **A2A SDK integration** with intelligent routing:
+
+```mermaid
+graph TD
+    A[User Request] --> B[🎯 Smart Orchestrator]
+    B --> C[A2A Card Resolver]
+    C --> D[Agent Discovery]
+    D --> E[Skill Analysis]
+    E --> F[Confidence Scoring]
+    F --> G{Route Decision}
+    
+    G -->|High Confidence| H[Forward to Best Agent]
+    G -->|Low Confidence| I[Fallback Response]
+    
+    H --> J[Agent Communication]
+    J --> K[Response Processing]
+    K --> L[Formatted Output]
+    
+    subgraph "A2A Integration"
+        C
+        D
+        E
+        F
+    end
+    
+    subgraph "Agent Routing"
+        G
+        H
+        J
+        K
+    end
+```
+
+### Core Components
+
+1. **A2A Card Resolver**: Fetches agent capabilities from running endpoints
+2. **Dynamic Skill Registry**: Extracts skills, tags, and keywords from AgentCards
+3. **Confidence Scoring**: Quantifies routing decisions based on skill matching
+4. **Agent Communication**: Handles HTTP communication with selected agents
+5. **Response Processing**: Formats agent responses for users
+
+## 🎯 Supported Agents
+
+### ArgoCD Agent
+- **Endpoint**: `http://localhost:8001`
+- **Skills**: `kubernetes_management`, `gitops`, `application_deployment`, `argocd_operations`, `sync_operations`, `resource_monitoring`
+- **Keywords**: `argocd`, `kubernetes`, `k8s`, `kubectl`, `deploy`, `application`, `sync`
+- **Use Cases**: Kubernetes management, GitOps operations, application deployment
+
+### Currency Agent
+- **Endpoint**: `http://localhost:8002`
+- **Skills**: `currency_exchange`, `financial_data`, `market_analysis`, `rate_conversion`, `historical_data`
+- **Keywords**: `currency`, `exchange`, `rate`, `convert`, `dollar`, `eur`, `usd`, `inr`, `gbp`, `jpy`
+- **Use Cases**: Currency conversion, exchange rates, financial data analysis
+
+### Math Agent
+- **Endpoint**: `http://localhost:8003`
+- **Skills**: `arithmetic_calculation`, `equation_solving`, `calculus_operations`, `matrix_operations`, `statistics_analysis`
+- **Keywords**: `calculate`, `solve`, `equation`, `derivative`, `integral`, `matrix`, `statistics`
+- **Use Cases**: Mathematical calculations, equation solving, calculus, statistics, matrix operations
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.10+ (updated for A2A SDK compatibility)
+- Python 3.10+ (required for A2A SDK compatibility)
 - [uv](https://docs.astral.sh/uv/) package manager
 
 ### Installation
@@ -21,74 +100,15 @@ uv sync
 ### Basic Usage
 
 ```bash
-# Simple request routing
-uv run -m app -m "List all ArgoCD applications"
-
-# Detailed output with routing information
+# Test intelligent routing
 uv run -m app -m "Convert 100 USD to EUR" -v
+uv run -m app -m "What is 2+3?" -v
+uv run -m app -m "List ArgoCD applications" -v
 
-# Run comprehensive tests
-uv run -m app.test_orchestrator
+# Test agent management
+uv run -m app -m "LIST_AGENTS"
+uv run -m app -m "REGISTER_AGENT:http://localhost:8080"
 ```
-
-## 🏗️ Architecture
-
-The orchestrator uses a **two-step LangGraph workflow** with intelligent routing:
-
-```mermaid
-graph TD
-    A[User Request] --> B[LangGraph Workflow]
-    B --> C[Request Analysis Node]
-    C --> D[Intelligent Routing Node]
-    D --> E[Skill-Based Matching]
-    E --> F[Confidence Scoring]
-    F --> G[Best Agent Selection]
-    G --> H[HTTP Communication]
-    H --> I[Response Processing]
-    I --> J[Formatted Output]
-    
-    subgraph "LangGraph Workflow"
-        B
-        C
-        D
-    end
-    
-    subgraph "Intelligent Routing Engine"
-        E
-        F
-        G
-    end
-```
-
-### Core Components
-
-1. **RouterState (TypedDict)**: Manages workflow state
-2. **AgentCard Integration**: Uses A2A SDK's AgentCard with skills
-3. **Skill-Based Routing**: Matches requests to agent capabilities
-4. **Confidence Scoring**: Calculates routing confidence (0.0-1.0)
-5. **LangGraph Workflow**: Structured decision-making pipeline
-
-## 🎯 Supported Agents
-
-### ArgoCD Agent
-- **Endpoint**: `http://localhost:8001`
-- **Skills**: `kubernetes_management`, `gitops`, `application_deployment`, `argocd_operations`, `sync_operations`, `resource_monitoring`
-- **Keywords**: `argocd`, `kubernetes`, `k8s`, `kubectl`, `deploy`, `application`, `sync`
-- **Use Cases**: Kubernetes management, GitOps operations, application deployment
-
-### Currency Agent
-- **Endpoint**: `http://localhost:8002`
-- **Skills**: `currency_exchange`, `financial_data`, `market_analysis`, `rate_conversion`, `historical_data`
-- **Keywords**: `currency`, `exchange`, `rate`, `convert`, `dollar`, `eur`, `usd`, `inr`, `gbp`, `jpy` (enhanced with currency codes)
-- **Use Cases**: Currency conversion, exchange rates, financial data analysis
-- **Fixed**: Now correctly routes single currency codes like "usd" with 60%+ confidence
-
-### Math Agent
-- **Endpoint**: `http://localhost:8003`
-- **Skills**: `arithmetic_calculation`, `equation_solving`, `calculus_operations`, `matrix_operations`, `statistics_analysis`
-- **Keywords**: `what is`, `calculate`, `solve`, `equation`, `derivative`, `integral`, `matrix`, `statistics`, `plus`, `minus`, `times`, `+`, `-`, `*`, `/`, `^`, `sum`, `product`, `number`, `numbers`
-- **Use Cases**: Mathematical calculations, equation solving, calculus, statistics, matrix operations
-- **Architecture**: MCP-based with SymPy and NumPy integration via Google AI (Gemini 1.5 Flash)
 
 ## 🔧 Running the Full System
 
@@ -97,204 +117,155 @@ graph TD
 **Terminal 1 - Currency Agent:**
 ```bash
 cd currencyAgent
+export GOOGLE_API_KEY=your_google_api_key
 uv sync
-uv run -m app --port 8002
+uv run -m app
 ```
 
-**Terminal 2 - ArgoCD Agent:**
-```bash
-cd argocdAgent
-uv sync
-uv run -m app --port 8001
-```
-
-**Terminal 3 - Math Agent:**
+**Terminal 2 - Math Agent:**
 ```bash
 cd mathAgent
 export GOOGLE_API_KEY=your_google_api_key
 uv sync
-uv run -m app --port 8003
+uv run -m app 
+```
+
+**Terminal 3 - ArgoCD Agent:**
+```bash
+cd argocdAgent
+export GOOGLE_API_KEY=your_google_api_key
+export ARGOCD_BASE_URL="https://your-argocd-server.com/"
+export ARGOCD_API_TOKEN="your-argocd-api-token"
+uv sync
+uv run -m app
 ```
 
 ### Step 2: Test the Orchestrator
 
-**Terminal 4 - Orchestrator:**
+**Terminal 4 - Smart Orchestrator:**
 ```bash
 cd orchestrator
 uv sync
+export GOOGLE_API_KEY=your_google_api_key
 
-# Test math requests
-uv run -m app -m "what is 2+3" -v
-uv run -m app -m "solve x^2 - 4 = 0" -v
-
-# Test currency requests
+# Test intelligent routing
 uv run -m app -m "What is the exchange rate for USD to EUR?" -v
-
-# Test ArgoCD requests
+uv run -m app -m "Solve x^2 - 4 = 0" -v
 uv run -m app -m "List all applications in my cluster" -v
 
-# Test skill-based routing
+# Test agent discovery
+uv run -m app -m "LIST_AGENTS"
+```
+
+## 🧪 Routing Examples
+
+### High-Confidence Routing
+```bash
+# Currency Agent (100% confidence)
+uv run -m app -m "What is 10 USD to INR?" -v
+# Output: Routes directly to Currency Agent
+
+# Math Agent (95% confidence)  
+uv run -m app -m "What is 2+3?" -v
+# Output: Routes directly to Math Agent
+
+# ArgoCD Agent (100% confidence)
+uv run -m app -m "Sync guestbook application" -v
+# Output: Routes directly to ArgoCD Agent
+```
+
+### Skill-Based Matching
+```bash
+# Financial operations → Currency Agent
+uv run -m app -m "financial market analysis" -v
+# Output: Currency Agent (69% confidence)
+
+# Mathematical operations → Math Agent
+uv run -m app -m "solve mathematical equation" -v
+# Output: Math Agent (84% confidence)
+
+# Kubernetes operations → ArgoCD Agent
 uv run -m app -m "kubernetes cluster management" -v
+# Output: ArgoCD Agent (74% confidence)
 ```
 
-## 🧪 Comprehensive Testing Infrastructure
+## 🔍 How Agent Discovery Works
 
-### 📋 Test Suite
-The Orchestrator includes comprehensive testing for request routing and agent coordination:
+### A2A Integration
+1. **Endpoint Discovery**: Connects to default agent endpoints (8080, 8081, 8082)
+2. **AgentCard Fetching**: Uses A2A CardResolver to get agent metadata
+3. **Skill Extraction**: Extracts skills, tags, descriptions, and names
+4. **Capability Registry**: Builds searchable keyword registry
 
-- **[Test Documentation](test/README.md)** - Complete testing guide
-- **`test_orchestrator.py`** - Request routing, agent selection, and coordination testing
+### Dynamic Registration
+```python
+# Register new agent
+orchestrator.register_agent("http://localhost:8083")
 
-```bash
-# Run comprehensive test suite
-cd orchestrator
-uv run python test/test_orchestrator.py
+# Unregister agent  
+orchestrator.unregister_agent("agent_name")
 
-# Expected: All routing tests pass with detailed agent selection logic
+# Get available agents
+orchestrator.get_available_agents()
 ```
 
-### Comprehensive Test Suite
-```bash
-# Run all tests with detailed output
-uv run -m app.test_orchestrator
+### Confidence Scoring Algorithm
+```python
+def calculate_agent_score(self, request: str, agent_card: AgentCard) -> float:
+    # 1. Skill name matching (primary)
+    # 2. Tag matching (secondary) 
+    # 3. Description keyword matching (tertiary)
+    # 4. Agent name matching (fallback)
+    # Returns: confidence score (0.0 - 1.0)
 ```
 
-### Individual Test Commands
-```bash
-# Test ArgoCD routing
-uv run -m app -m "Sync the guestbook application in ArgoCD"
+## 🛠️ Technical Implementation
 
-# Test Currency routing (enhanced)
-uv run -m app -m "Convert 100 USD to Japanese Yen"
-uv run -m app -m "usd" -v  # Fixed: Now routes to Currency Agent
-uv run -m app -m "how much is 10 USD in INR?" -v  # Fixed: Clean responses
+### A2A SDK Integration
 
-# Test Math routing
-uv run -m app -m "what is 2+3" -v  # Routes to Math Agent
-uv run -m app -m "solve x^2 - 4 = 0" -v  # Mathematical operations
-
-# Test skill matching
-uv run -m app -m "financial market analysis"
-
-# Test default routing
-uv run -m app -m "Hello world"
-```
-
-## 💻 Programmatic Usage
+The orchestrator uses A2A SDK for standardized agent communication:
 
 ```python
-import asyncio
-from app.orchestrator import SmartOrchestrator
+from a2a.client import A2AClient, A2ACardResolver
+from a2a.types import AgentCard, AgentSkill
 
-async def main():
-    orchestrator = SmartOrchestrator()
-    
-    # Process a request
-    result = await orchestrator.process_request(
-        "Deploy my application using GitOps"
-    )
-    
-    print(f"✅ Routed to: {result['selected_agent_name']}")
-    print(f"📊 Confidence: {result['confidence']:.1%}")
-    print(f"🧠 Reasoning: {result['reasoning']}")
-    print(f"📝 Response: {result['response']}")
+# Fetch agent card
+resolver = A2ACardResolver(httpx_client=client, base_url=endpoint)
+agent_card = await resolver.get_agent_card()
 
-asyncio.run(main())
+# Extract capabilities
+for skill in agent_card.skills:
+    self.skill_keywords[skill.name] = skill.tags + [skill.description]
 ```
 
-### Adding New Agents Dynamically
+### LangGraph Workflow
+
+The orchestrator uses a simple LangGraph workflow:
 
 ```python
-from a2a_sdk import AgentCard, Skill
+workflow = StateGraph(RouterState)
+workflow.add_node("analyze", self._analyze_request)
+workflow.add_node("route", self._route_to_agent)
+workflow.set_entry_point("analyze")
+workflow.add_edge("analyze", "route")
+workflow.set_finish_point("route")
+```
 
-# Create skills for new agent
-monitoring_skills = [
-    Skill("system_monitoring", "System performance monitoring", 0.9),
-    Skill("alert_management", "Alert and notification management", 0.85)
+### Configuration
+
+Environment variables and defaults:
+
+```python
+# Default agent endpoints
+default_agents = [
+    "http://localhost:8001",  # Configurable
+    "http://localhost:8002",  # Configurable  
+    "http://localhost:8003"   # Configurable
 ]
 
-# Create agent card
-monitoring_agent = AgentCard(
-    agent_id="monitoring",
-    name="Monitoring Agent", 
-    description="Handles system monitoring and alerting",
-    skills=monitoring_skills,
-    endpoint="http://localhost:8003",
-    metadata={
-        "keywords": ["monitor", "alert", "performance", "metrics"],
-        "capabilities": ["system_metrics", "log_analysis"]
-    }
-)
-
-# Add to orchestrator
-orchestrator.add_agent(monitoring_agent)
+# HTTP client configuration
+httpx.AsyncClient(timeout=5.0, verify=False)
 ```
-
-## 📊 Response Format
-
-### Success Response
-```json
-{
-  "success": true,
-  "request": "List all ArgoCD applications",
-  "selected_agent_id": "argocd",
-  "selected_agent_name": "ArgoCD Agent",
-  "agent_skills": ["kubernetes_management", "gitops", "application_deployment"],
-  "confidence": 0.89,
-  "reasoning": "Selected ArgoCD Agent based on keywords: argocd, application",
-  "response": "Agent response content here",
-  "metadata": {
-    "request_id": "uuid",
-    "start_timestamp": "2025-01-15T10:30:00Z",
-    "agent_scores": {"argocd": 3.925, "currency": 0.0},
-    "skill_matches": {"argocd": ["application_deployment"], "currency": []},
-    "agent_endpoint": "http://localhost:8001"
-  }
-}
-```
-
-### Error Response
-```json
-{
-  "success": false,
-  "request": "Original request",
-  "error": "Error description",
-  "metadata": {
-    "request_id": "uuid",
-    "error_type": "connection_failed"
-  }
-}
-```
-
-## 🔍 Routing Logic
-
-The orchestrator uses **hybrid routing** combining:
-
-1. **Keyword Matching**: Scores based on keyword presence in request
-2. **Skill Matching**: Matches request intent to agent skills
-3. **Confidence Weighting**: Uses skill confidence levels for scoring
-4. **Fallback Strategy**: Defaults to ArgoCD agent if no clear match
-
-### Scoring Formula
-```
-Total Score = (Keyword Matches × 1.0) + (Skill Matches × Skill Confidence × 1.5)
-Final Confidence = min(Total Score / 5.0, 1.0)
-```
-
-## 🛠️ Configuration
-
-### Environment Variables
-```bash
-# Optional: Override default agent endpoints
-export ARGOCD_AGENT_URL="http://localhost:8001"
-export CURRENCY_AGENT_URL="http://localhost:8002"
-```
-
-### Agent Configuration
-Agents are configured using AgentCard objects with:
-- **Skills**: Capability definitions with confidence levels
-- **Keywords**: Trigger words for routing
-- **Metadata**: Additional capabilities and configuration
 
 ## 🔧 Development
 
@@ -303,94 +274,97 @@ Agents are configured using AgentCard objects with:
 orchestrator/
 ├── app/
 │   ├── __init__.py
-│   ├── __main__.py          # CLI interface
-│   ├── orchestrator.py      # Core orchestrator logic
-│   └── test_orchestrator.py # Test suite
-├── pyproject.toml           # Dependencies
+│   ├── __main__.py           # CLI entry point
+│   ├── agent_executor.py     # A2A agent executor
+│   └── orchestrator.py       # Smart orchestrator logic
+├── pyproject.toml           # Dependencies and metadata
 └── README.md               # This file
 ```
 
-### Key Dependencies
-- **langgraph**: Workflow orchestration framework
-- **a2a-sdk**: A2A protocol implementation
-- **httpx**: Async HTTP client
-- **click**: Command-line interface
-- **pydantic**: Data validation
+### Dependencies
+```toml
+dependencies = [
+    "a2a-sdk>=0.2.6,<0.3.0",    # A2A protocol support
+    "fastapi>=0.104.0",          # Web framework
+    "uvicorn[standard]>=0.24.0", # ASGI server
+    "httpx>=0.25.0",             # HTTP client
+    "langgraph>=0.2.0",          # Workflow orchestration
+    "langchain-core>=0.3.0",     # LangChain integration
+]
+```
 
-### Adding New Agent Types
+### Running as A2A Agent
+```bash
+# Start as A2A agent server
+uv run -m app
 
-1. **Create AgentCard**:
+# Test agent endpoint
+curl http://localhost:8000/agent-card
+```
+
+### Direct CLI Usage  
+```bash
+# Direct message processing
+uv run -m app -m "Your message here" -v
+
+# With debugging
+uv run -m app -m "Convert USD to EUR" -v -d
+```
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+# Run orchestrator tests
+uv run pytest
+
+# Test agent discovery
+uv run -m app -m "LIST_AGENTS"
+
+# Test routing logic
+uv run -m app -m "Convert 100 USD to EUR" -v
+```
+
+### Integration Tests
+```bash
+# Test with running agents
+cd ../currencyAgent && uv run -m app &
+cd ../mathAgent && uv run -m app &
+cd ../argocdAgent && uv run -m app &
+
+# Test orchestrator routing
+uv run -m app -m "What is 2+3?" -v
+uv run -m app -m "Convert 100 USD to EUR" -v
+```
+
+## 📚 API Reference
+
+### SmartOrchestrator Class
+
 ```python
-new_agent = AgentCard(
-    agent_id="new_agent",
-    name="New Agent",
-    skills=[Skill("skill_name", "description", confidence)],
-    endpoint="http://localhost:8004"
-)
+class SmartOrchestrator:
+    def __init__(self) -> None
+    async def register_agent(self, endpoint: str) -> Dict
+    async def unregister_agent(self, agent_identifier: str) -> Dict
+    def get_available_agents(self) -> List[Dict]
+    async def process_request(self, request: str) -> Dict
 ```
 
-2. **Register Agent**:
-```python
-orchestrator.add_agent(new_agent)
-```
+### Key Methods
 
-3. **Test Routing**:
-```python
-result = await orchestrator.process_request("test request")
-```
+- `register_agent()`: Register new agent by endpoint
+- `unregister_agent()`: Remove agent by ID/name/endpoint
+- `get_available_agents()`: List all registered agents
+- `process_request()`: Route request to best agent
 
-## 🐛 Troubleshooting
+## 🔮 Future Enhancements
 
-### Common Issues
-
-**1. Agent Connection Failed**
-```bash
-# Check if agents are running
-lsof -i :8001  # ArgoCD Agent
-lsof -i :8002  # Currency Agent
-
-# Restart agents if needed
-cd argocdAgent && uv run -m app --port 8001
-cd currencyAgent && uv run -m app --port 8002
-```
-
-**2. Import Errors**
-```bash
-# Reinstall dependencies
-uv sync --force
-```
-
-**3. Routing Issues**
-```bash
-# Test with verbose output to see routing logic
-uv run -m app -m "your request" -v
-```
-
-### Debug Mode
-```bash
-# Enable detailed logging
-uv run -m app -m "test request" -v
-```
-
-## 📈 Performance
-
-- **Average routing time**: ~50ms
-- **Agent communication**: ~200ms (local)
-- **Memory usage**: ~50MB base
-- **Concurrent requests**: Supports async processing
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Run the test suite: `uv run -m app.test_orchestrator`
-5. Submit a pull request
-
-## 📄 License
-
-This project is part of the A2A MCP ecosystem. See the main repository LICENSE file for details.
+- **Load Balancing**: Route to multiple instances of same agent type
+- **Health Monitoring**: Periodic agent health checks
+- **Caching**: Response caching for repeated requests
+- **Agent Marketplace**: Dynamic agent discovery from registry
+- **Advanced Routing**: Machine learning-based routing optimization
 
 ---
 
-**🎉 Ready to orchestrate your agents!** Start with the Quick Start section and explore the intelligent routing capabilities. 
+**Built with A2A Protocol, LangGraph, and intelligent agent routing** 🚀 

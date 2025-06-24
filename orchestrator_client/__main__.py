@@ -336,7 +336,7 @@ async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str
 
 
 @click.command()
-@click.option("--orchestrator", default="http://localhost:8000")
+@click.option("--agent", default="http://localhost:8000")
 @click.option("--list_agent", is_flag=True, help="List all available agents from orchestrator")
 @click.option("--register_agent", default="")
 @click.option("--unregister_agent", default="")
@@ -346,7 +346,7 @@ async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str
 @click.option("--push_notification_receiver", default="http://localhost:5000")
 @click.option("--header", multiple=True)
 async def orchestratorClient(
-    orchestrator,
+    agent,
     list_agent,
     register_agent,
     unregister_agent,
@@ -359,7 +359,7 @@ async def orchestratorClient(
     headers = {h.split("=")[0]: h.split("=")[1] for h in header}
     print(f"Will use headers: {headers}")
     async with httpx.AsyncClient(timeout=30, headers=headers) as httpx_client:
-        card_resolver = A2ACardResolver(httpx_client, orchestrator)
+        card_resolver = A2ACardResolver(httpx_client, agent)
         card = await card_resolver.get_agent_card()
 
         print("======= Agent Card ========")
@@ -367,19 +367,19 @@ async def orchestratorClient(
         
         # Handle list_agent flag
         if list_agent:
-            await list_available_agents(httpx_client, orchestrator, card)
+            await list_available_agents(httpx_client, agent, card)
             return
         
         # Handle register_agent option
         if register_agent != "":
-            await register_agent_with_orchestrator(httpx_client, orchestrator, register_agent)
+            await register_agent_with_orchestrator(httpx_client, agent, register_agent)
             return
         if unregister_agent != "":
-            await unregister_agent_with_orchestrator(httpx_client, orchestrator, unregister_agent)
+            await unregister_agent_with_orchestrator(httpx_client, agent, unregister_agent)
             return
 
         # Default behavior: show available agents and continue with interactive mode
-        await list_available_agents(httpx_client, orchestrator, card)
+        await list_available_agents(httpx_client, agent, card)
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
         notification_receiver_host = notif_receiver_parsed.hostname or "localhost"
@@ -391,7 +391,7 @@ async def orchestratorClient(
             )
 
             notification_receiver_auth = PushNotificationReceiverAuth()
-            await notification_receiver_auth.load_jwks(f"{orchestrator}/.well-known/jwks.json")
+            await notification_receiver_auth.load_jwks(f"{agent}/.well-known/jwks.json")
 
             push_notification_listener = PushNotificationListener(
                 host=notification_receiver_host,
