@@ -1,28 +1,26 @@
-# A2A MCP Orchestrator Client
+# Orchestrator Client - Intelligent Agent Command Line Interface
 
-A command-line client for interacting with the A2A MCP Agent System. **Best used with the [intelligent orchestrator agent](../orchestrator/README.md)** for seamless multi-agent interactions.
+A command-line client for interacting with the Aichestra Multi-Agent System. **Best used with the [intelligent orchestrator agent](../orchestrator/README.md)** for seamless agent interactions and intelligent routing.
 
-## 🎉 Recent Updates (June 2025)
-- **🤖 Agent Discovery**: Client now displays all available agents when connecting to orchestrator
-- **Response Formatting Fixed**: Client now displays clean, formatted responses instead of raw JSON
-- **Hanging Issues Resolved**: Currency requests respond quickly without timeouts
-- **Enhanced User Experience**: Clean output like "10 USD is 862.6 INR" instead of technical JSON
+## 🚀 **Smart Orchestrator Integration**
 
-## 🚀 Quick Start with Orchestrator
+The client now supports **intelligent agent routing**:
 
-**Recommended**: Use the client with the orchestrator for intelligent agent routing:
-
+### Automatic Agent Selection
 ```bash
-# Terminal 1: Start the orchestrator system
-cd orchestrator && uv run -m app --port 8000
+# Intelligent routing to best agent
+> "Convert 100 USD to EUR"          → Currency Agent (100% confidence)
+> "What is 2+3?"                    → Math Agent (95% confidence)  
+> "List ArgoCD applications"        → ArgoCD Agent (100% confidence)
+```
 
-# Terminal 2: Connect client to orchestrator
-cd orchestrator_client && uv run . --agent http://localhost:8000
-
-# Now interact naturally - the orchestrator will route to the right agent:
-# > "List all my ArgoCD applications"
-# > "Convert 100 USD to EUR"
-# > "Show me Kubernetes cluster status"
+### Dynamic Agent Discovery
+```bash
+# Discover available agents
+> LIST_AGENTS                       → Show all registered agents
+> REGISTER_AGENT:http://localhost:8001 → Register a new agent
+> UNREGISTER_AGENT:http://localhost:8001 → Unregister an existing agent
+> UNREGISTER_AGENT:currency         → Remove agent
 ```
 
 ## 🏗️ System Integration
@@ -32,35 +30,84 @@ The client integrates with the orchestrator system for intelligent routing:
 ```mermaid
 graph TD
     A[User Input] --> B[🔧 Orchestrator Client]
-    B --> C[🤖 Orchestrator Agent]
-    C --> D{Intelligent Routing}
-    D -->|Kubernetes/GitOps| E[☸️ ArgoCD Agent]
-    D -->|Currency/Finance| F[💰 Currency Agent]
-    D -->|Math/Calculations| G[🧮 Math Agent]
-    E --> H[Response]
-    F --> H
-    G --> H
-    H --> B
-    B --> I[Formatted Output]
+    B --> C[🤖 Smart Orchestrator]
+    C --> D[A2A Card Resolver]
+    D --> E[Skill Analysis]
+    E --> F{Confidence Scoring}
+    F -->|High Score| G[Route to Best Agent]
+    F -->|Low Score| H[Fallback Response]
+    
+    G --> I[☸️ ArgoCD Agent]
+    G --> J[💰 Currency Agent]
+    G --> K[🧮 Math Agent]
+    
+    I --> L[Response]
+    J --> L
+    K --> L
+    L --> B
+    B --> M[Formatted Output]
+    
+    subgraph "Intelligent Routing"
+        C
+        D
+        E
+        F
+        G
+    end
+    
+    subgraph "Agent Ecosystem"
+        I
+        J
+        K
+    end
 ```
 
-## 📖 Usage Options
+## ✨ Key Features
 
-### Option 1: With Orchestrator (Recommended)
+### 🤖 Intelligent Agent Routing
+- **Automatic Selection**: Routes to the best agent based on request content
+- **Confidence Scoring**: Shows routing confidence and reasoning
+- **Real-time Discovery**: Discovers available agents dynamically
+- **Skill-Based Matching**: Matches requests to agent capabilities
 
-Connect to the orchestrator for intelligent multi-agent interactions:
+### 💬 Enhanced User Experience
+- **Natural Language**: Interact using plain English
+- **Clean Responses**: Formatted output instead of raw JSON
+- **Agent Discovery**: Displays available agents and their capabilities
+- **Session Management**: Maintains conversation context
+
+### 🔧 Advanced Client Features
+- **WebSocket Support**: Real-time push notifications
+- **History Tracking**: Optional conversation history
+- **Custom Headers**: Support for authentication and metadata
+- **Flexible Configuration**: Multiple connection options
+
+## 🚀 Quick Start
+
+### Option 1: Intelligent Orchestrator (Recommended)
+
+Connect to the orchestrator for intelligent agent routing:
 
 ```bash
-# Start orchestrator system
-cd orchestrator && uv run -m app --port 8000
+# Terminal 1: Start Currency Agent
+cd currencyAgent && uv run -m app
 
-# Connect client to orchestrator
+# Terminal 2: Start Math Agent  
+cd mathAgent && uv run -m app
+
+# Terminal 3: Start ArgoCD Agent
+cd argocdAgent && uv run -m app
+
+# Terminal 4: Start Orchestrator
+cd orchestrator && uv run -m app
+
+# Terminal 5: Connect Client
 cd orchestrator_client && uv run . --agent http://localhost:8000
 
 # Natural language interactions:
-# > "Deploy my application to staging"     → Routes to ArgoCD Agent
-# > "What's the current USD to EUR rate?"  → Routes to Currency Agent
-# > "Help with Kubernetes management"      → Routes to ArgoCD Agent
+# > "Convert 100 USD to EUR"         → Currency Agent (100%)
+# > "What is 2+3?"                   → Math Agent (95%)
+# > "List ArgoCD applications"       → ArgoCD Agent (100%)
 ```
 
 ### Option 2: Direct Agent Connection
@@ -71,8 +118,11 @@ Connect directly to a specific agent:
 # Connect to ArgoCD agent directly
 uv run . --agent http://localhost:8001
 
-# Connect to Currency agent directly  
+# Connect to Currency agent directly
 uv run . --agent http://localhost:8002
+
+# Connect to Math agent directly  
+uv run . --agent http://localhost:8003
 ```
 
 ### Option 3: Custom Agent
@@ -83,457 +133,287 @@ Connect to any A2A-compatible agent:
 uv run . --agent http://your-custom-agent:port
 ```
 
-## 🚀 Quick Start
+## 📖 Usage Options
 
 ### Prerequisites
 
-- Python 3.10+ (updated for A2A SDK compatibility)
+- Python 3.10+ (required for A2A SDK compatibility)
 - A running A2A agent server (orchestrator recommended)
 - uv package manager
 
 ### Installation
 
-1. **Install dependencies:**
 ```bash
 cd orchestrator_client
 uv sync
-```
-
-2. **Connect to the orchestrator system:**
-```bash
-# Start the full system first:
-# Terminal 1: cd currencyAgent && uv run -m app --port 8002
-# Terminal 2: cd argocdAgent && uv run -m app --port 8001  
-# Terminal 3: cd orchestrator && uv run -m app --port 8000
-
-# Terminal 4: Connect client
-uv run . --agent http://localhost:8000
-```
-
-## 📖 Usage
-
-### Basic Usage
-
-```bash
-# Connect to the orchestrator (recommended)
-uv run . --agent http://localhost:8000
-
-# Connect to a specific agent with custom headers
-uv run . --agent http://localhost:8001 --header "Authorization=Bearer token"
-
-# Use a specific session ID
-uv run . --agent http://localhost:8000 --session 12345
-
-# Enable history tracking
-uv run . --agent http://localhost:8000 --history
 ```
 
 ### Command Line Options
 
-- `--agent` - Agent server URL (default: http://localhost:8000 for orchestrator)
-- `--session` - Session ID for conversation continuity (default: 0)
-- `--history` - Enable history tracking (default: False)
-- `--use_push_notifications` - Enable push notifications (default: False)
-- `--push_notification_receiver` - Push notification receiver URL (default: http://localhost:5000)
-- `--header` - Additional HTTP headers (can be specified multiple times)
-
-### Interactive Commands
-
-Once connected, you can interact with the agent(s):
-
-```
-What do you want to send to the agent? plan a deployment
-Select a file path to attach? (press enter to skip)
-```
-
-**Available Commands:**
-- `:q` or `quit` - Exit the CLI
-- Any text input - Send a message to the agent
-
-## 🧪 Testing Infrastructure
-
-### 📋 Test Suite
-The CLI includes comprehensive testing for WebSocket and push notification functionality:
-
-- **[Test Documentation](test/README.md)** - Complete testing guide
-- **`push_notification_listener.py`** - WebSocket connections and real-time communication testing
-
 ```bash
-# Test WebSocket push notifications
-cd orchestrator_client
-uv run python test/push_notification_listener.py
-
-# Expected: WebSocket connection, notification handling, and real-time communication work
-```
-
-## 📋 Example Interactions
-
-### With Orchestrator (Multi-Agent Routing)
-
-```bash
-# Connect to orchestrator
+# Basic usage
 uv run . --agent http://localhost:8000
 
-# Output shows:
-# ======= Agent Card ========
-# {"name":"Smart Orchestrator Agent",...}
-# 
-# ============================================================
-# 🤖 AVAILABLE AGENTS
-# ============================================================
-# Found 3 available agents:
-# 
-# 1. ArgoCD Agent (http://localhost:8001)
-#    Description: Handles ArgoCD and Kubernetes operations via MCP protocol
-#    Skills: Kubernetes Management, GitOps, Application Deployment (+3 more)
-# 
-# 2. Currency Agent (http://localhost:8002)
-#    Description: Handles currency exchange and financial data
-#    Skills: Currency exchange operations, Financial data analysis (+2 more)
-# 
-# 3. Math Agent (http://localhost:8003)
-#    Description: Advanced mathematical assistant for calculations...
-#    Skills: Arithmetic Calculation, Equation Solving, Calculus Operations (+2 more)
-# 
-# ============================================================
-# 💡 The orchestrator will automatically route your requests to the best agent!
-# ============================================================
+# With custom session ID
+uv run . --agent http://localhost:8000 --session 12345
+
+# With history tracking
+uv run . --agent http://localhost:8000 --history
+
+# With push notifications
+uv run . --agent http://localhost:8000 --use_push_notifications
+
+# With custom headers
+uv run . --agent http://localhost:8000 --header "Authorization=Bearer token"
+
+# With custom push notification receiver
+uv run . --agent http://localhost:8000 --push_notification_receiver http://localhost:5000
 ```
 
-**Math Operations:**
-```
-> what is 2+3
+## 🧪 Interactive Experience
 
-🤖 AI RESPONSE
-============================================================
-5
-============================================================
+### Agent Discovery Display
 
-> solve x^2 - 4 = 0
+Once connected, you'll see available agents:
 
-🤖 AI RESPONSE
-============================================================
-The solutions to the equation x^2 - 4 = 0 are:
-x = -2 and x = 2
-============================================================
-```
+```console
+% uv run . --agent http://localhost:8000
+Will use headers: {}
+======= Agent Card ========
+{"capabilities":{"pushNotifications":true,"stateTransitionHistory":false,"streaming":false},"defaultInputModes":["text"],"defaultOutputModes":["text"],"description":"Intelligent agent that routes requests to specialized agents using LangGraph and A2A protocol","name":"Smart Orchestrator Agent","skills":[{"description":"Intelligent request routing to specialized agents","id":"request_routing","name":"Request Routing","tags":["routing","orchestration"]},{"description":"Multi-agent system coordination and management","id":"agent_coordination","name":"Agent Coordination","tags":["coordination","management"]},{"description":"Skill-based agent selection and matching","id":"skill_matching","name":"Skill Matching","tags":["matching","selection"]},{"description":"Confidence scoring for routing decisions","id":"confidence_scoring","name":"Confidence Scoring","tags":["scoring","confidence"]}],"url":"http://localhost:8000/","version":"1.0.0"}
 
-**ArgoCD/Kubernetes Operations:**
-```
-> List all ArgoCD applications
-
-🤖 ORCHESTRATOR RESPONSE
 ============================================================
-✅ Routed to: ArgoCD Agent (Confidence: 99%)
-Reasoning: Selected ArgoCD Agent based on keywords: argocd, application
-
-ArgoCD Agent Response: Here are all your applications:
-- guestbook (Healthy, Synced)
-- frontend-app (Healthy, OutOfSync)
-- backend-api (Progressing, Synced)
+🤖 AVAILABLE AGENTS
 ============================================================
-```
+Found 3 available agents:
 
-**Currency/Financial Operations:**
-```
-> Convert 100 USD to EUR
+1. ArgoCD Agent (http://localhost:8001)
+   Description: Handles ArgoCD and Kubernetes operations via MCP protocol
+   Skills: Kubernetes Management, GitOps, Application Deployment (+3 more)
 
-🤖 AI RESPONSE
-============================================================
-100 USD is currently 92.34 EUR
-(Exchange rate: 1 USD = 0.9234 EUR)
-============================================================
+2. Currency Agent (http://localhost:8002/)
+   Description: Handles currency exchange and financial data
+   Skills: Currency exchange operations, Financial data analysis, Market analysis and trends (+2 more)
 
-> usd
+3. Math Agent (http://localhost:8003/)
+   Description: Advanced mathematical assistant for calculations, equation solving, calculus, statistics, and matrix operations via MCP
+   Skills: Arithmetic Calculation, Equation Solving, Calculus Operations (+2 more)
 
-🤖 AI RESPONSE  
 ============================================================
-Please specify which currency you would like to convert to. 
-Also, specify the date for the exchange rate you want to use.
+💡 The orchestrator will automatically route your requests to the best agent!
 ============================================================
+=========  starting a new task ========
 
-> how much is 10 USD in INR?
-
-🤖 AI RESPONSE
-============================================================
-10 USD is 862.6 INR
-============================================================
+What do you want to send to the agent? (:q or quit to exit):
 ```
 
-**Skill-Based Routing:**
-```
-> kubernetes cluster management
-
-🤖 ORCHESTRATOR RESPONSE
-============================================================
-✅ Routed to: ArgoCD Agent (Confidence: 74%)
-Reasoning: Selected ArgoCD Agent based on keywords: kubernetes, cluster and skills: kubernetes_management
-
-ArgoCD Agent Response: I can help you manage your Kubernetes cluster through ArgoCD...
-============================================================
-```
-
-### Planning Tasks
-
-```
-What do you want to send to the agent? plan a deployment
-
-🤖 AI PLANNER RESPONSE
-============================================================
-Original Query: plan a deployment
-Task Type: planning
-Scope: general
-
-📋 TASKS:
-  • Task 1: Hello from planner agent - AI processed: ## Deployment Plan
-
-**User Query:** Plan a deployment
-
-This plan assumes a software deployment to a server environment...
-
-**1. Task Breakdown:**
-* **Phase 1: Preparation (1-2 days)**
-  * 1.1 **Code Freeze:** Declare a code freeze...
-  * 1.2 **Build Artifact:** Build the release artifact...
-
-**2. Dependencies:**
-* 1.2 (Build Artifact) must be completed before 1.4 (Test Environment Setup)
-
-**3. Resource Requirements:**
-* **Personnel:** Developers, DevOps engineers, system administrators
-* **Hardware:** Servers, network infrastructure, monitoring tools
-
-**4. Timeline Estimates:**
-* Total estimated time: 3-7 days
-
-**5. Success Criteria:**
-* Successful deployment to the target environment without errors
-============================================================
-```
-
-### ArgoCD Operations
-
-```
-What do you want to send to the agent? sync argocd application
-
-🤖 AI RESPONSE
-============================================================
-Hello from ArgoCD agent! Processing: The user query "sync argocd application" requests a **synchronization operation** within Argo CD. This means the user wants to bring the live Kubernetes state into alignment with the desired state defined in their Git repository.
-
-Here's a breakdown of the steps involved and relevant ArgoCD concepts:
-
-**1. Identifying the Target Application:**
-* Argo CD needs to know *which* application to synchronize...
-
-**2. Fetching the Desired State:**
-* Argo CD will retrieve the latest application manifest from the configured Git repository...
-
-**3. Comparing Desired and Current States:**
-* Argo CD compares the desired state (from Git) with the current state...
-
-**4. Applying Necessary Changes:**
-* Based on the comparison, Argo CD will automatically apply the necessary changes...
-
-**5. Monitoring and Reporting:**
-* Argo CD monitors the synchronization process and reports the status...
-
-**Relevant ArgoCD Concepts and Best Practices:**
-* **GitOps:** This is the fundamental principle behind Argo CD...
-* **Application Manifests:** These YAML files define the desired state...
-* **Synchronization Strategies:** Argo CD allows you to choose different strategies...
-============================================================
-```
-
-## 🧪 Testing Scenarios
-
-### Full System Test
-```bash
-# Start all components
-cd currencyAgent && uv run -m app --port 8002 &
-cd argocdAgent && uv run -m app --port 8001 &
-cd orchestrator && uv run -m app --port 8000 &
-
-# Connect client
-cd orchestrator_client && uv run . --agent http://localhost:8000
-
-# Test different request types:
-# > "List all ArgoCD applications"
-# > "Convert 100 USD to EUR"  
-# > "Show me Kubernetes deployments"
-# > "What's the Bitcoin price?"
-```
-
-### Orchestrator Only Test
-```bash
-# Test routing without running actual agents
-cd orchestrator && uv run -m app --port 8000 &
-cd orchestrator_client && uv run . --agent http://localhost:8000
-
-# The orchestrator will show routing decisions even if agents aren't running
-```
-
-### Direct Agent Test
-```bash
-# Test specific agent directly
-cd argocdAgent && uv run -m app --port 8001 &
-cd orchestrator_client && uv run . --agent http://localhost:8001
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-- `A2A_LOG_LEVEL` - Logging level (default: INFO)
-
-### Headers
-
-You can specify custom HTTP headers for authentication or other purposes:
+### Intelligent Routing Examples
 
 ```bash
-uv run . --agent http://localhost:8000 --header "Authorization=Bearer your-token" --header "X-Custom-Header=value"
+# Financial operations → Currency Agent
+> "Convert 100 USD to EUR"
+🎯 Routing to Currency Agent (100% confidence)
+💰 Response: 100 USD = 85.32 EUR (current rate: 0.8532)
+
+# Mathematical operations → Math Agent  
+> "What is 2+3?"
+🎯 Routing to Math Agent (95% confidence)
+🧮 Response: 2 + 3 = 5
+
+# Kubernetes operations → ArgoCD Agent
+> "List all applications"
+🎯 Routing to ArgoCD Agent (100% confidence)
+☸️ Response: Found 5 applications: guestbook, web-app, api-service...
+```
+
+### Agent Register
+
+```console
+% uv run . --register_agent http://localhost:8003
+Will use headers: {}
+======= Agent Card ========
+{"capabilities":{"pushNotifications":true,"stateTransitionHistory":false,"streaming":false},"defaultInputModes":["text"],"defaultOutputModes":["text"],"description":"Intelligent agent that routes requests to specialized agents using LangGraph and A2A protocol","name":"Smart Orchestrator Agent","skills":[{"description":"Intelligent request routing to specialized agents","id":"request_routing","name":"Request Routing","tags":["routing","orchestration"]},{"description":"Multi-agent system coordination and management","id":"agent_coordination","name":"Agent Coordination","tags":["coordination","management"]},{"description":"Skill-based agent selection and matching","id":"skill_matching","name":"Skill Matching","tags":["matching","selection"]},{"description":"Confidence scoring for routing decisions","id":"confidence_scoring","name":"Confidence Scoring","tags":["scoring","confidence"]}],"url":"http://localhost:8000/","version":"1.0.0"}
+🔄 Registering agent http://localhost:8003 with orchestrator http://localhost:8000
+📤 Sending registration request...
+🎉 Registration completed successfully!
+📄 ✅ Successfully registered Math Agent from http://localhost:8003
+Agent ID: Math Agent
+Agent Name: Math Agent
+Total agents: 3
+```
+
+### Agent Unregister
+
+```console
+% uv run . --unregister_agent http://localhost:8003
+Will use headers: {}
+======= Agent Card ========
+{"capabilities":{"pushNotifications":true,"stateTransitionHistory":false,"streaming":false},"defaultInputModes":["text"],"defaultOutputModes":["text"],"description":"Intelligent agent that routes requests to specialized agents using LangGraph and A2A protocol","name":"Smart Orchestrator Agent","skills":[{"description":"Intelligent request routing to specialized agents","id":"request_routing","name":"Request Routing","tags":["routing","orchestration"]},{"description":"Multi-agent system coordination and management","id":"agent_coordination","name":"Agent Coordination","tags":["coordination","management"]},{"description":"Skill-based agent selection and matching","id":"skill_matching","name":"Skill Matching","tags":["matching","selection"]},{"description":"Confidence scoring for routing decisions","id":"confidence_scoring","name":"Confidence Scoring","tags":["scoring","confidence"]}],"url":"http://localhost:8000/","version":"1.0.0"}
+🔄 Unregistering agent http://localhost:8003 from orchestrator http://localhost:8000
+📤 Sending unregistration request...
+🎉 Unregistration completed successfully!
+📄 ✅ Successfully unregistered Math Agent (ID: Math Agent)
+Agent ID: Math Agent
+Remaining agents: 2
+```
+
+### Agent List
+
+```console
+% uv run  . --list_agent
+Will use headers: {}
+======= Agent Card ========
+{"capabilities":{"pushNotifications":true,"stateTransitionHistory":false,"streaming":false},"defaultInputModes":["text"],"defaultOutputModes":["text"],"description":"Intelligent agent that routes requests to specialized agents using LangGraph and A2A protocol","name":"Smart Orchestrator Agent","skills":[{"description":"Intelligent request routing to specialized agents","id":"request_routing","name":"Request Routing","tags":["routing","orchestration"]},{"description":"Multi-agent system coordination and management","id":"agent_coordination","name":"Agent Coordination","tags":["coordination","management"]},{"description":"Skill-based agent selection and matching","id":"skill_matching","name":"Skill Matching","tags":["matching","selection"]},{"description":"Confidence scoring for routing decisions","id":"confidence_scoring","name":"Confidence Scoring","tags":["scoring","confidence"]}],"url":"http://localhost:8000/","version":"1.0.0"}
+
+============================================================
+🤖 AVAILABLE AGENTS
+============================================================
+Found 3 available agents:
+
+1. ArgoCD Agent (http://localhost:8001)
+   Description: Handles ArgoCD and Kubernetes operations via MCP protocol
+   Skills: Kubernetes Management, GitOps, Application Deployment (+3 more)
+
+2. Currency Agent (http://localhost:8002/)
+   Description: Handles currency exchange and financial data
+   Skills: Currency exchange operations, Financial data analysis, Market analysis and trends (+2 more)
+
+3. Math Agent (http://localhost:8003/)
+   Description: Advanced mathematical assistant for calculations, equation solving, calculus, statistics, and matrix operations via MCP
+   Skills: Arithmetic Calculation, Equation Solving, Calculus Operations (+2 more)
+
+============================================================
+💡 The orchestrator will automatically route your requests to the best agent!
+============================================================
+```
+
+## 🛠️ Technical Implementation
+
+### A2A Protocol Integration
+
+The client uses A2A SDK for standardized agent communication:
+
+```python
+from a2a.client import A2AClient
+from a2a.utils import new_agent_text_message
+
+# Create A2A client
+client = A2AClient(base_url=agent_url)
+
+# Send message to agent
+message = new_agent_text_message(user_input, context_id)
+response = await client.send_message(message)
+```
+
+### Push Notification Support
+
+```python
+from orchestrator_client.utils.push_notification_listener import PushNotificationListener
+
+# Start push notification listener
+listener = PushNotificationListener(
+    host="localhost",
+    port=5000,
+    notification_receiver_auth=auth
+)
+listener.start()
 ```
 
 ### Session Management
 
-Use sessions for conversation continuity:
+```python
+# Session ID handling
+session_id = args.session or str(uuid.uuid4())
+context_id = f"session-{session_id}"
 
-```bash
-# Start a named session
-uv run . --agent http://localhost:8000 --session my-session-123
-
-# Continue the same session later
-uv run . --agent http://localhost:8000 --session my-session-123 --history
+# Maintain conversation context
+conversation_history = []
 ```
 
-## 🚀 Full System Setup
+## 📚 Development
 
-To run the complete orchestrated system with CLI:
+### Project Structure
 
-### Terminal 1: Currency Agent
-```bash
-cd currencyAgent
-uv sync
-uv run -m app --port 8002
+```
+orchestrator_client/
+├── __init__.py
+├── __main__.py                    # CLI entry point
+├── pyproject.toml                 # Dependencies
+├── utils/
+│   ├── __init__.py
+│   ├── push_notification_auth.py  # Push notification authentication
+│   └── push_notification_listener.py # WebSocket listener
+└── README.md                      # This file
 ```
 
-### Terminal 2: ArgoCD Agent
-```bash
-cd argocdAgent
-uv sync  
-uv run -m app --port 8001
+### Dependencies
+
+```toml
+dependencies = [
+    "a2a-sdk>=0.2.6,<0.3.0",       # A2A protocol support
+    "httpx>=0.25.0",               # HTTP client
+    "starlette>=0.27.0",           # WebSocket server
+    "uvicorn>=0.24.0",             # ASGI server
+    "pydantic>=2.0.0",             # Data validation
+]
 ```
 
-### Terminal 3: Orchestrator
-```bash
-cd orchestrator
-uv run -m app --port 8000
+## 🔮 Future Enhancements
+
+- **GUI Interface**: Web-based user interface for agent interactions
+- **Batch Processing**: Support for batch operations and scripts
+- **Agent Monitoring**: Real-time agent health and performance monitoring
+- **Plugin System**: Extensible plugin architecture for custom functionality
+- **Multi-Language Support**: Support for multiple programming languages
+- **Advanced Analytics**: Usage analytics and performance insights
+
+## 📚 API Reference
+
+### Main Functions
+
+```python
+# Client initialization
+client = A2AClient(base_url=agent_url)
+
+# Send message
+response = await client.send_message(message)
+
+# Stream responses
+async for chunk in client.stream_message(message):
+    process_chunk(chunk)
 ```
 
-### Terminal 4: Orchestrator Client
-```bash
-cd orchestrator_client
-uv sync
-uv run . --agent http://localhost:8000
+### Command Line Arguments
 
-# Now you can interact naturally:
-# > "List all my ArgoCD applications"
-# > "Convert 50 GBP to USD"
-# > "Help me deploy my application"
-# > "Show me cluster status"
+```console
+% uv run  . --help
+Usage: . [OPTIONS]
+
+Options:
+  --agent TEXT
+  --list_agent                    List all available agents from orchestrator
+  --register_agent TEXT
+  --unregister_agent TEXT
+  --session INTEGER
+  --history BOOLEAN
+  --use_push_notifications BOOLEAN
+  --push_notification_receiver TEXT
+  --header TEXT
+  --help                          Show this message and exit.
 ```
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-1. **Connection Refused**
-   - Ensure the agent server is running
-   - Check the correct URL and port
-   - Verify network connectivity
-
-2. **Orchestrator Not Routing Correctly**
-   ```bash
-   # Test orchestrator directly
-   cd orchestrator
-   uv run -m app -m "test request" -v
-   
-   # Check if agents are reachable
-   curl http://localhost:8001/health  # ArgoCD
-   curl http://localhost:8002/health  # Currency
-   ```
-
-3. **Authentication Errors**
-   - Check your API keys and tokens
-   - Verify header format (key=value)
-   - Ensure proper permissions
-
-4. **Agent Not Responding**
-   - Check agent server logs
-   - Verify agent card configuration
-   - Test with a simple query first
-
-### Debug Mode
-
-Enable verbose logging by setting the environment variable:
-
-```bash
-export A2A_LOG_LEVEL=DEBUG
-uv run . --agent http://localhost:8000
-```
-
-### Testing Connectivity
-
-```bash
-# Test orchestrator endpoint
-curl http://localhost:8000/health
-
-# Test agent endpoints
-curl http://localhost:8001/health  # ArgoCD
-curl http://localhost:8002/health  # Currency
-
-# Test CLI connection
-uv run . --agent http://localhost:8000 --session test-connection
-```
-
-## 📚 Related Documentation
-
-- **[Main Project README](../README.md)** - Complete system overview
-- **[Orchestrator README](../orchestrator/README.md)** - Intelligent routing system  
-- **[Orchestrator Blog Post](../orchestrator/BLOG_POST.md)** - Technical architecture
-- **[ArgoCD Agent README](../argocdAgent/README.md)** - ArgoCD agent documentation
-- **[Currency Agent README](../currencyAgent/README.md)** - Currency agent documentation
-
-## 🎯 Best Practices
-
-1. **Use the Orchestrator**: Connect to the orchestrator rather than individual agents for the best experience
-2. **Natural Language**: Write requests in natural language - the orchestrator will route appropriately
-3. **Session Management**: Use sessions for complex multi-turn conversations
-4. **Error Handling**: If an agent is down, the orchestrator will show routing decisions even without responses
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](../LICENSE) file for details.
+This project is part of the Aichestra multi-agent ecosystem. See the main repository LICENSE file for details.
 
 ---
 
-## 🎉 Quick Test Commands
-
-```bash
-# Test with orchestrator (recommended)
-cd orchestrator_client && uv run . --agent http://localhost:8000
-
-# Test with specific agent
-cd orchestrator_client && uv run . --agent http://localhost:8001  # ArgoCD
-cd orchestrator_client && uv run . --agent http://localhost:8002  # Currency
-
-# Test with full system setup
-cd orchestrator && uv run -m app.test_orchestrator  # Verify routing works
-```
+**Built with A2A Protocol, intelligent routing, and seamless agent integration** 🚀

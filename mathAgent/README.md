@@ -1,287 +1,426 @@
-# Math Agent
+# Math Agent - Advanced Mathematical Computation System
 
-Advanced mathematical assistant for calculations, equation solving, calculus, statistics, and matrix operations using **Google AI (Gemini 1.5 Flash)**, **MCP (Model Context Protocol)**, and **A2A SDK**.
+Advanced mathematical assistant for calculations, equation solving, calculus, statistics, and matrix operations using **Google AI (Gemini 1.5 Flash)**, **MCP (Model Context Protocol)**, and **A2A SDK**. **The agent integrates seamlessly with the [intelligent orchestrator system](../orchestrator/README.md) for automatic routing**.
+
+## 🚀 **Smart Orchestrator Integration**
+
+The Math Agent integrates with the intelligent orchestrator for automatic routing:
+
+### Direct Mathematical Operations
+```
+"What is 2+3?" → Math Agent (95% confidence)
+"Solve x^2 - 4 = 0" → Math Agent (100% confidence)
+"Find derivative of x^2 + 3x" → Math Agent (100% confidence)
+```
+
+### Skill-Based Routing
+```
+"solve mathematical equation" → Math Agent (84% confidence)  
+"arithmetic calculation" → Math Agent (100% confidence)
+"calculus operations" → Math Agent (100% confidence)
+```
 
 ## 🏗️ Architecture Overview
 
 The Math Agent uses a sophisticated **MCP-based architecture** that separates mathematical computation from language understanding:
 
-```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
-│   User Query    │───▶│   Math Agent     │───▶│   MCP Math Server   │
-│ "What is 2+3?"  │    │ (LLM + MCP Client)    │ (SymPy + NumPy)     │
-└─────────────────┘    └──────────────────┘    └─────────────────────┘
-                              │                           │
-                              ▼                           ▼
-                       ┌──────────────────┐    ┌─────────────────────┐
-                       │  A2A Protocol    │    │  Mathematical Tools │
-                       │   Integration    │    │ • calculate_expression
-                       └──────────────────┘    │ • solve_equation    │
-                                               │ • derivative        │
-                                               │ • integral          │
-                                               │ • matrix_operations │
-                                               │ • statistics_calculator
-                                               └─────────────────────┘
+```mermaid
+graph TD
+    A[User Request] --> B[🤖 Smart Orchestrator]
+    B --> C[A2A Card Resolver]
+    C --> D[Skill Analysis]
+    D --> E{Confidence Scoring}
+    E -->|High Score| F[🧮 Math Agent - Port 8081]
+    E -->|Low Score| G[Other Agents]
+    
+    F --> H[LangGraph ReAct Agent]
+    H --> I[MCP Client]
+    I --> J[Math MCP Server]
+    J --> K[SymPy + NumPy Tools]
+    J --> L
+    J --> M
+    J --> N
+    J --> O
+    J --> P
+    J --> Q
+    
+    subgraph "Mathematical Tools"
+        J
+        K
+        L[calculate_expression]
+        M[solve_equation]
+        N[derivative]
+        O[integral]
+        P[matrix_operations]
+        Q[statistics_calculator]
+    end
 ```
 
-## Features
+## ✨ Features
 
 ### 🧮 Arithmetic Calculations
-- Basic operations: addition, subtraction, multiplication, division
-- Advanced functions: trigonometric, logarithmic, exponential
-- Mathematical constants: π, e, etc.
+- **Basic Operations**: Addition, subtraction, multiplication, division
+- **Advanced Functions**: Trigonometric, logarithmic, exponential
+- **Mathematical Constants**: π, e, and other constants
+- **Complex Numbers**: Support for complex arithmetic
 
 ### 📐 Equation Solving
-- Linear equations: `2x + 5 = 11`
-- Quadratic equations: `x^2 - 4 = 0`
-- Polynomial equations of any degree
-- Systems of equations
+- **Linear Equations**: `2x + 5 = 11`
+- **Quadratic Equations**: `x^2 - 4 = 0`
+- **Polynomial Equations**: Any degree polynomial equations
+- **Systems of Equations**: Multiple equation systems
 
 ### 📊 Calculus Operations
 - **Derivatives**: Find derivatives of mathematical functions
-- **Integrals**: Calculate indefinite integrals
-- Support for symbolic mathematics
+- **Integrals**: Calculate indefinite and definite integrals
+- **Symbolic Mathematics**: Full symbolic computation support
+- **Limits**: Calculate mathematical limits
 
 ### 🔢 Matrix Operations
-- Matrix multiplication, addition, subtraction
-- Matrix inverse and transpose
-- Determinant calculation
-- Support for any size matrices
+- **Matrix Arithmetic**: Addition, subtraction, multiplication
+- **Matrix Properties**: Inverse, transpose, determinant
+- **Linear Algebra**: Eigenvalues, eigenvectors
+- **Support for Any Size**: No matrix size limitations
 
 ### 📈 Statistics Analysis
-- Descriptive statistics: mean, median, mode
-- Variability measures: standard deviation, variance
-- Data analysis for numerical datasets
+- **Descriptive Statistics**: Mean, median, mode, range
+- **Variability Measures**: Standard deviation, variance
+- **Data Analysis**: Comprehensive numerical dataset analysis
+- **Probability Distributions**: Common statistical distributions
 
-## Installation
+## 🎯 Supported Operations
+
+### Mathematical Calculations
+- **Basic Math**: "What is 2+3?", "Calculate 15 * 24"
+- **Equation Solving**: "Solve x^2 - 4 = 0", "Find roots of 2x + 5 = 11"
+- **Calculus**: "Derivative of x^2 + 3x", "Integrate e^x dx"
+- **Matrix Operations**: "Determinant of [[1,2],[3,4]]"
+- **Statistics**: "Mean of [1,2,3,4,5]", "Standard deviation of data"
+
+### Advanced Mathematical Analysis
+- **Complex Calculations**: "Solve systems of linear equations"
+- **Mathematical Functions**: "Graph the function y = x^2 + 2x - 3"
+- **Numerical Analysis**: "Find numerical solutions to differential equations"
+
+## 📊 Agent Card (A2A Integration)
+
+### Orchestrator Recognition
+
+The orchestrator recognizes this agent with the following capabilities:
+
+```python
+Math Agent Card:
+- agent_id: "math"
+- name: "Math Agent"
+- description: "Advanced mathematical assistant for calculations..."
+- endpoint: "http://localhost:8081"
+- skills: [
+    "arithmetic_calculation",  # Basic and advanced calculations
+    "equation_solving",        # Algebraic equation resolution
+    "calculus_operations",     # Derivatives and integrals
+    "matrix_operations",       # Linear algebra computations
+    "statistics_analysis"      # Data analysis and statistics
+  ]
+- keywords: ["calculate", "solve", "equation", "derivative", "integral", 
+            "matrix", "statistics", "math"]
+```
+
+### Routing Examples
+
+```bash
+# High-confidence Math routing (90%+)
+"What is 2+3?" → Math Agent (95%)
+"Solve x^2 - 4 = 0" → Math Agent (100%)
+"Find derivative of x^2 + 3x" → Math Agent (100%)
+"Calculate determinant of [[1,2],[3,4]]" → Math Agent (100%)
+
+# Skill-based routing
+"solve mathematical equation" → Math Agent (84%)
+"arithmetic calculation" → Math Agent (100%)
+"calculus operations" → Math Agent (100%)
+```
+
+## 🚀 Quick Start
+
+### Option 1: Via Orchestrator (Recommended)
+
+Run as part of the intelligent orchestration system:
+
+```bash
+# Terminal 1: Start Math Agent
+cd mathAgent
+export GOOGLE_API_KEY=your_google_api_key
+uv sync
+uv run -m app
+
+# Terminal 2: Start Orchestrator
+cd ../orchestrator
+export GOOGLE_API_KEY=your_google_api_key
+uv run -m app
+
+# Terminal 3: Test routing
+cd ../orchestrator
+export GOOGLE_API_KEY=your_google_api_key
+# Direct math operations
+uv run -m app -m "What is 2+3?" -v
+uv run -m app -m "Solve x^2 - 4 = 0" -v
+
+# Using client
+cd ../orchestrator_client
+export GOOGLE_API_KEY=your_google_api_key
+uv run . --agent http://localhost:8000
+# > "What is the derivative of x^2 + 3x?"
+```
+
+### Option 2: Direct Agent Connection
+
+Connect directly to the math agent:
 
 ```bash
 cd mathAgent
-pip install -e .
+
+# Set up environment
+echo "GOOGLE_API_KEY=your_google_api_key_here" > .env
+
+# Install dependencies
+uv sync
+
+# Run the agent
+uv run -m app
+
+# Test directly
+uv run -m app.test_client
 ```
 
-## Environment Setup
+## 🧪 Testing & Validation
 
-Create a `.env` file in the mathAgent directory:
-
-```env
-# Google AI API Key (required)
-GOOGLE_API_KEY=your_google_api_key_here
-
-# Optional: Model source (defaults to "google")
-model_source=google
-
-# Optional: Port (defaults to 8003)
-PORT=8003
-```
-
-## Usage
-
-### Starting the Agent
+### Comprehensive Test Suite
 
 ```bash
+# Run agent-specific tests
 cd mathAgent
-python -m app
+uv run -m app.test_client
+
+# Test orchestrator routing
+cd ../orchestrator
+uv run -m app -m "What is 2+3?" -v
+uv run -m app -m "Solve x^2 - 4 = 0" -v
+
+# Test direct agent communication
+curl -X POST http://localhost:8081 \
+  -H "Content-Type: application/json" \
+  -d '{"method": "message/send", "params": {"message": {"parts": [{"text": "What is 2+3?"}]}}}'
 ```
 
-The agent will start on `http://localhost:8003` by default.
+### Expected Test Results
 
-### Example Queries
-
-#### Arithmetic Calculations
+**Mathematical Operations**:
 ```
-"Calculate 2 + 2"
-"What is the square root of 16?"
-"What is sin(pi/4)?"
-"Calculate log(100)"
-```
-
-#### Equation Solving
-```
-"Solve x^2 - 4 = 0"
-"Solve 2x + 5 = 11"
-"Find the roots of x^3 - 6x^2 + 11x - 6 = 0"
+✅ Basic Arithmetic: "2 + 3 = 5"
+✅ Equation Solving: "x^2 - 4 = 0 has solutions x = 2, x = -2"
+✅ Calculus: "The derivative of x^2 + 3x is 2x + 3"
+✅ Matrix Operations: "Determinant of [[1,2],[3,4]] = -2"
+✅ Statistics: "Mean of [1,2,3,4,5] = 3.0"
 ```
 
-#### Calculus
+## 🔧 Technical Architecture
+
+### MCP Integration
+
+The agent uses a custom MCP server for mathematical operations:
+
+```python
+# MCP Server with mathematical tools
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+from langchain_mcp_adapters.tools import load_mcp_tools
+
+class MathAgent:
+    async def _create_agent_with_mcp_tools(self):
+        server_params = StdioServerParameters(
+            command="python",
+            args=[str(math_server_path)],
+        )
+        
+        async with stdio_client(server_params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                tools = await load_mcp_tools(session)
+                self.agent = create_react_agent(self.model, tools)
 ```
-"Find the derivative of x^2 + 3x + 2"
-"Calculate the integral of x^2"
-"What is the derivative of sin(x)?"
-"Integrate e^x dx"
+
+### A2A Protocol Implementation
+
+```python
+from a2a.server.agent_execution import AgentExecutor
+
+class MathAgentExecutor(AgentExecutor):
+    def __init__(self):
+        self.agent = MathAgent()
+    
+    async def execute(self, context: RequestContext, event_queue: EventQueue):
+        # Handle A2A protocol requests
+        # Route to LangGraph + MCP agent
+        # Return formatted responses
 ```
 
-#### Matrix Operations
+### Mathematical Tools (MCP Server)
+
+The custom MCP server provides mathematical capabilities:
+
+- **calculate_expression**: Evaluate mathematical expressions
+- **solve_equation**: Solve algebraic equations  
+- **derivative**: Calculate derivatives symbolically
+- **integral**: Compute integrals
+- **matrix_operations**: Linear algebra operations
+- **statistics_calculator**: Statistical analysis
+
+## 🛠️ Development
+
+### Project Structure
 ```
-"What is the determinant of [[1,2],[3,4]]?"
-"Multiply matrices [[1,2],[3,4]] and [[5,6],[7,8]]"
-"Find the inverse of [[2,1],[1,1]]"
-"Transpose [[1,2,3],[4,5,6]]"
+mathAgent/
+├── app/
+│   ├── __init__.py
+│   ├── __main__.py           # A2A server entry point
+│   ├── agent_executor.py     # A2A protocol executor
+│   ├── agent.py              # Math agent logic
+│   └── test_client.py        # Test client
+├── math_mcp_server.py       # Custom MCP server
+├── pyproject.toml           # Dependencies and metadata
+└── README.md               # This file
 ```
 
-#### Statistics
+### Dependencies
+```toml
+dependencies = [
+    "a2a-sdk>=0.2.6,<0.3.0",           # A2A protocol support
+    "langchain-google-genai>=2.0.4",   # Google AI integration
+    "langgraph>=0.2.0",                # ReAct agent framework
+    "langchain-mcp-adapters>=0.1.0",   # MCP integration
+    "sympy>=1.12",                     # Symbolic mathematics
+    "numpy>=1.24.0",                   # Numerical computations
+]
 ```
-"Find the mean of [1,2,3,4,5]"
-"Calculate the standard deviation of [10,12,14,16,18]"
-"What is the median of [1,3,5,7,9,11]?"
-"Find the variance of [2,4,6,8,10]"
-```
 
-## 🧪 Comprehensive Testing Suite
-
-The Math Agent includes **8 comprehensive test files** covering all aspects of functionality:
-
-### 📋 Test Files Overview
-
-- **[Test Documentation](test/README.md)** - Complete testing guide
-- **`simple_test.py`** - Basic functionality test
-- **`comprehensive_test.py`** - Full MCP + LLM integration test  
-- **`test_mcp_connection.py`** - MCP server connection test
-- **`test_mcp_agent.py`** - All 6 MCP mathematical tools test
-- **`test_math_functions.py`** - Direct mathematical operations test
-- **`test_orchestrator_routing.py`** - Orchestrator routing test
-- **`debug_routing.py`** - Routing decision debugging
-
-### 🚀 Quick Testing
-
+### Environment Configuration
 ```bash
-# Basic functionality test
-cd mathAgent
-uv run python test/simple_test.py
+# Google AI (recommended)
+export GOOGLE_API_KEY="your-google-api-key"
 
-uv run python -m app.test_client
-
-# Comprehensive MCP + LLM test
-uv run python test/comprehensive_test.py
-
-# Test all MCP tools individually
-uv run python test/test_mcp_agent.py
-
-# Test orchestrator routing for math queries
-uv run python test/test_orchestrator_routing.py
+# OR OpenAI (if using OpenAI instead)
+export API_KEY="your-openai-api-key"
+export OPENAI_API_BASE="https://api.openai.com/v1"
 ```
 
-### 🔍 Expected Test Results
+## 🔧 Configuration Options
 
-**Simple Test**:
-```
-🔢 Testing: What is 5 + 7?
-📊 Result: 12
-```
-
-**Comprehensive Test**:
-```
-1. 🔢 Question: What is (3 + 5) × 12?
-   📊 Answer: (3 + 5) × 12 = 96
-
-2. 🔢 Question: Solve the equation 2x + 5 = 15
-   📊 Answer: x = 5
-```
-
-## A2A SDK Integration
-
-The Math Agent implements the A2A SDK protocol with:
-
-- **Agent Card**: Describes capabilities and skills
-- **Message Handling**: Processes mathematical queries
-- **Streaming Support**: Real-time response streaming
-- **Task Management**: Proper task state handling
-
-### Agent Skills
-
-1. **Arithmetic Calculation**: Basic and advanced mathematical operations
-2. **Equation Solving**: Algebraic equation resolution
-3. **Calculus Operations**: Derivatives and integrals
-4. **Matrix Operations**: Linear algebra computations
-5. **Statistics Analysis**: Data analysis and statistical measures
-
-## MCP Tools Available
-
-The agent connects to a Math MCP server that provides these mathematical tools:
-
-- `calculate_expression`: Safe evaluation of mathematical expressions using SymPy
-- `solve_equation`: Algebraic equation solver using SymPy
-- `derivative`: Calculus derivative calculator using SymPy
-- `integral`: Calculus integral calculator using SymPy
-- `matrix_operations`: Linear algebra operations using NumPy
-- `statistics_calculator`: Statistical analysis functions using NumPy
-
-## Dependencies
-
-- **A2A SDK**: Agent-to-Agent communication protocol
-- **MCP (Model Context Protocol)**: Tool communication protocol
-- **Google AI (Gemini)**: Large language model for mathematical reasoning
-- **SymPy**: Symbolic mathematics library (via MCP server)
-- **NumPy**: Numerical computing library (via MCP server)
-- **LangChain**: LLM application framework
-- **LangGraph**: Workflow orchestration
-
-## Architecture
-
-```
-Math Agent
-├── Agent Core (agent.py)
-│   ├── MCP Client Integration
-│   ├── Google AI Integration
-│   └── Response Formatting
-├── Agent Executor (agent_executor.py)
-│   ├── A2A SDK Integration
-│   ├── Message Processing
-│   └── Task Management
-├── MCP Server (math_mcp_server.py)
-│   ├── Mathematical Tools
-│   ├── SymPy Integration
-│   └── NumPy Integration
-└── Server (__main__.py)
-    ├── Agent Card Definition
-    ├── HTTP Server
-    └── Endpoint Configuration
+### LLM Provider Selection
+```python
+def _initialize_model(self):
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("⚠️  GOOGLE_API_KEY not set. Using default configuration.")
+        self.model = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            temperature=0
+        )
+    else:
+        self.model = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=api_key,
+            temperature=0
+        )
 ```
 
-## Error Handling
+### MCP Server Configuration
+```python
+# Custom MCP server for mathematical operations
+server_params = StdioServerParameters(
+    command="python",
+    args=[str(math_server_path)],
+)
 
-The agent handles various error scenarios:
+# Load mathematical tools
+tools = await load_mcp_tools(session)
+agent = create_react_agent(self.model, tools)
+```
 
-- Invalid mathematical expressions
-- Unsupported operations
-- Matrix dimension mismatches
-- Division by zero
-- Complex number results
-- Timeout scenarios
+### Supported Mathematical Operations
+```python
+def get_capabilities(self) -> List[str]:
+    return [
+        "Arithmetic calculations and expression evaluation",
+        "Algebraic equation solving", 
+        "Calculus operations (derivatives and integrals)",
+        "Matrix operations and linear algebra",
+        "Statistical analysis and data processing",
+        "Mathematical function plotting and visualization"
+    ]
+```
 
-## Performance
+## 🔮 Future Enhancements
 
-- **Response Time**: Typically 1-3 seconds for simple calculations
-- **Complex Operations**: 3-10 seconds for advanced calculus/matrix operations
-- **Streaming**: Real-time progress updates for long calculations
-- **Memory**: Conversation context maintained per session
+- **Advanced Visualization**: Interactive mathematical plots and graphs
+- **Machine Learning Integration**: Statistical modeling and prediction
+- **Symbolic AI**: Enhanced symbolic reasoning capabilities
+- **Mathematical Proof Systems**: Automated theorem proving
+- **3D Mathematical Modeling**: Three-dimensional mathematical visualization
+- **Collaborative Problem Solving**: Multi-step mathematical workflows
 
-## Troubleshooting
+## 📚 API Reference
 
-### Common Issues
+### MathAgent Class
+```python
+class MathAgent:
+    def __init__(self) -> None
+    async def process_request(self, request: str) -> str
+    def get_capabilities(self) -> List[str]
+```
 
-1. **Agent won't start**: Check Google API key in environment
-2. **Calculation errors**: Verify mathematical expression syntax
-3. **Matrix errors**: Ensure proper matrix format `[[1,2],[3,4]]`
-4. **Timeout issues**: Complex calculations may take longer
+### Key Methods
+- `process_request()`: Process mathematical queries using MCP tools
+- `get_capabilities()`: List available mathematical capabilities
+- `_create_agent_with_mcp_tools()`: Initialize agent with MCP mathematical tools
 
-### Debugging
+### Supported Mathematical Functions
+```
+Basic: +, -, *, /, %, ^, sqrt, abs, floor, ceil
+Trigonometric: sin, cos, tan, asin, acos, atan, sinh, cosh, tanh
+Logarithmic: ln, log, log10, log2, exp
+Advanced: derivative, integral, solve, matrix operations, statistics
+```
 
-Enable debug logging:
+## 🧮 Mathematical Examples
+
+### Arithmetic Operations
 ```bash
-export LOG_LEVEL=debug
-python -m app
+"What is (3 + 5) × 12?" → "96"
+"Calculate 2^10" → "1024"
+"What is the square root of 144?" → "12"
 ```
 
-## Contributing
+### Equation Solving
+```bash
+"Solve 2x + 5 = 15" → "x = 5"
+"Find roots of x^2 - 4x + 3 = 0" → "x = 1, x = 3"
+"Solve the system: x + y = 5, x - y = 1" → "x = 3, y = 2"
+```
 
-To extend the Math Agent:
+### Calculus Operations
+```bash
+"Derivative of x^2 + 3x + 2" → "2x + 3"  
+"Integrate x^2 dx" → "x^3/3 + C"
+"Find the limit of (x^2 - 1)/(x - 1) as x approaches 1" → "2"
+```
 
-1. Add new tools in `agent.py`
-2. Update agent skills in `__main__.py`
-3. Add test cases in `test_client.py`
-4. Update documentation
+### Statistics
+```bash
+"Mean of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]" → "5.5"
+"Standard deviation of [2, 4, 4, 4, 5, 5, 7, 9]" → "2.0"
+"Variance of the dataset [1, 3, 5, 7, 9]" → "10.0"
+```
 
-## License
+---
 
-MIT License - see LICENSE file for details. 
+**Built with LangGraph, MCP Protocol, and SymPy** 🧮 

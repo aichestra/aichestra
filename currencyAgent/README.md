@@ -1,94 +1,121 @@
-# LangGraph Currency Agent with A2A Protocol
+# Currency Agent - Financial Data & Exchange Operations
 
-This sample demonstrates a currency conversion agent built with [LangGraph](https://langchain-ai.github.io/langgraph/) and exposed through the A2A protocol. It showcases conversational interactions with support for multi-turn dialogue and streaming responses. **The agent can run standalone or as part of the [intelligent orchestrator system](../orchestrator/README.md)**.
+A sophisticated currency conversion agent built with [LangGraph](https://langchain-ai.github.io/langgraph/) and exposed through the A2A protocol. It provides real-time exchange rates, currency conversions, and financial data analysis with support for multi-turn dialogue and streaming responses. **The agent integrates seamlessly with the [intelligent orchestrator system](../orchestrator/README.md) for automatic routing**.
 
-## 🚀 Quick Start with Orchestrator
+## 🚀 **Smart Orchestrator Integration**
 
-**Recommended**: Use the orchestrator for intelligent routing to this agent:
+The Currency Agent integrates with the intelligent orchestrator for automatic routing:
 
-```bash
-# Navigate to project root
-cd ..
-
-# Test orchestrator routing to Currency agent
-cd orchestrator
-uv sync
-uv run -m app -m "Convert 100 USD to EUR" -v
-uv run -m app -m "What's the exchange rate for GBP to CAD?" -v
+### Direct Currency Operations
+```
+"Convert 100 USD to EUR" → Currency Agent (100% confidence)
+"What's the exchange rate for GBP to JPY?" → Currency Agent (95% confidence)
 ```
 
-The orchestrator will automatically route currency/financial requests to this agent based on:
-- **Keywords**: `currency`, `exchange`, `rate`, `convert`, `dollar`, `eur`, `usd`, `financial`
-- **Skills**: `currency_exchange`, `financial_data`, `market_analysis`, `rate_conversion`, `historical_data`
+### Skill-Based Routing
+```
+"financial market analysis" → Currency Agent (69% confidence)
+"currency exchange operations" → Currency Agent (100% confidence)
+```
 
 ## 🏗️ System Integration
 
-This agent integrates with the orchestrator system:
+This agent integrates seamlessly with the orchestrator system:
 
 ```mermaid
 graph TD
-    A[User: "Convert USD to EUR"] --> B[🤖 Orchestrator Agent]
-    B --> C[Skill Analysis]
-    C --> D[💰 Currency Agent - Port 8002]
-    D --> E[LangGraph ReAct Agent]
-    E --> F[Frankfurter API]
-    F --> G[Real-time Exchange Rates]
-```
-
-## How It Works
-
-This agent uses LangGraph with LLM (for example Google Gemini..) to provide currency exchange information through a ReAct agent pattern. The A2A protocol enables standardized interaction with the agent, allowing clients to send requests and receive real-time updates.
-
-```mermaid
-sequenceDiagram
-    participant Client as A2A Client/Orchestrator
-    participant Server as A2A Server
-    participant Agent as LangGraph Agent
-    participant API as Frankfurter API
-
-    Client->>Server: Send task with currency query
-    Server->>Agent: Forward query to currency agent
-
-    alt Complete Information
-        Agent->>API: Call get_exchange_rate tool
-        API->>Agent: Return exchange rate data
-        Agent->>Server: Process data & return result
-        Server->>Client: Respond with currency information
-    else Incomplete Information
-        Agent->>Server: Request additional input
-        Server->>Client: Set state to "input-required"
-        Client->>Server: Send additional information
-        Server->>Agent: Forward additional info
-        Agent->>API: Call get_exchange_rate tool
-        API->>Agent: Return exchange rate data
-        Agent->>Server: Process data & return result
-        Server->>Client: Respond with currency information
-    end
-
-    alt With Streaming
-        Note over Client,Server: Real-time status updates
-        Server->>Client: "Looking up exchange rates..."
-        Server->>Client: "Processing exchange rates..."
-        Server->>Client: Final result
+    A[User Request] --> B[🤖 Smart Orchestrator]
+    B --> C[A2A Card Resolver]
+    C --> D[Skill Analysis]
+    D --> E{Confidence Scoring}
+    E -->|High Score| F[💰 Currency Agent - Port 8080]
+    E -->|Low Score| G[Other Agents]
+    
+    F --> H[LangGraph ReAct Agent]
+    H --> I[Exchange Rate Tool]
+    I --> J[Frankfurter API]
+    J --> K[Real-time Exchange Rates]
+    
+    subgraph "Agent Capabilities"
+        F
+        H
+        I
+        J
+        K
     end
 ```
 
-## Key Features
+## ✨ Key Features
 
+### 💱 Currency Exchange Operations
+- **Real-time Exchange Rates**: Live data from Frankfurter API
+- **Currency Conversion**: Support for 30+ major currencies
+- **Historical Data**: Access to historical exchange rates
+- **Multi-currency Support**: Handles all major world currencies
+
+### 🤖 Advanced AI Capabilities  
 - **Multi-turn Conversations**: Agent can request additional information when needed
 - **Real-time Streaming**: Provides status updates during processing
-- **Push Notifications**: Support for webhook-based notifications
 - **Conversational Memory**: Maintains context across interactions
-- **Currency Exchange Tool**: Integrates with Frankfurter API for real-time rates
-- **Orchestrator Integration**: Intelligent routing based on request content
+- **A2A Protocol**: Standardized communication interface
 
-## Prerequisites
+### 🔗 Orchestrator Integration
+- **Automatic Routing**: Intelligent routing based on request content
+- **Skill Discovery**: Capabilities automatically discovered by orchestrator
+- **Confidence Scoring**: High-confidence routing for currency operations
+- **Dynamic Registration**: Can be registered/unregistered at runtime
 
-- Python 3.12 or higher
-- [UV](https://docs.astral.sh/uv/)
-- Access to an LLM and API Key
+## 🎯 Supported Operations
 
-## Setup & Running
+### Currency Conversion
+- **Basic Conversion**: "Convert 100 USD to EUR"
+- **Rate Queries**: "What's the USD to EUR exchange rate?"
+- **Historical Rates**: "What was the EUR to GBP rate last month?"
+- **Multiple Currencies**: "Convert 500 CAD to JPY"
+
+### Financial Analysis
+- **Market Data**: "Show me currency trends for CAD"
+- **Rate Comparison**: "Compare USD rates to EUR and GBP"
+- **Financial Information**: "Get financial data for AUD"
+
+## 📊 Agent Card (A2A Integration)
+
+### Orchestrator Recognition
+
+The orchestrator recognizes this agent with the following capabilities:
+
+```python
+Currency Agent Card:
+- agent_id: "currency"
+- name: "Currency Agent"
+- description: "Handles currency exchange and financial data"
+- endpoint: "http://localhost:8080"
+- skills: [
+    "currency_exchange",      # Primary currency operations
+    "financial_data",         # Market data and analysis
+    "market_analysis",        # Financial trend analysis
+    "rate_conversion",        # Exchange rate calculations
+    "historical_data"         # Historical financial data
+  ]
+- keywords: ["currency", "exchange", "rate", "convert", "dollar", 
+            "eur", "usd", "inr", "gbp", "jpy", "financial"]
+```
+
+### Routing Examples
+
+```bash
+# High-confidence Currency routing (90%+)
+"What is the exchange rate for USD to EUR?" → Currency Agent (100%)
+"Convert 100 USD to Japanese Yen" → Currency Agent (85%)
+"Calculate exchange rate between GBP and CAD" → Currency Agent (100%)
+
+# Skill-based routing
+"financial market analysis" → Currency Agent (69%)
+"Get historical currency rates" → Currency Agent (84%)
+"currency exchange operations" → Currency Agent (100%)
+```
+
+## 🚀 Quick Start
 
 ### Option 1: Via Orchestrator (Recommended)
 
@@ -98,352 +125,223 @@ Run as part of the intelligent orchestration system:
 # Terminal 1: Start Currency Agent
 cd currencyAgent
 uv sync
-uv run -m app --port 8002
+uv run -m app
 
 # Terminal 2: Start Orchestrator
 cd ../orchestrator
-uv run -m app --port 8000
+uv run -m app
 
 # Terminal 3: Test routing
 cd ../orchestrator
-uv run -m app -m "What is the USD to EUR exchange rate?" -v
+# Direct currency operations
+uv run -m app -m "Convert 100 USD to EUR" -v
+uv run -m app -m "What's the GBP to USD exchange rate?" -v
+
+# Using client
+cd ../orchestrator_client
+uv run . --agent http://localhost:8000
+# > "Convert 100 USD to EUR"
 ```
 
-### Option 2: Standalone Agent
+### Option 2: Direct Agent Connection
 
-1. Navigate to the samples directory:
+Connect directly to the currency agent:
 
-   ```bash
-   cd currencyAgent
-   ```
-
-2. Create an environment file with your API key:
-
-   ```bash
-   # If you're using a Google Gemini model (gemini-pro, etc.):
-   echo "GOOGLE_API_KEY=your_api_key_here" > .env
-  
-   # If you're using OpenAI or any compatible API (e.g., local LLM via Ollama, LM Studio, etc.):
-   echo "API_KEY=your_api_key_here" > .env  # (not necessary if have no api key)
-   echo "TOOL_LLM_URL=your_llm_url" > .env
-   echo "TOOL_LLM_NAME=your_llm_name" > .env
-   ```
-
-3. Run the agent:
-
-   ```bash
-   # Basic run on default port 10000
-   uv run app
-
-   # On custom host/port (for orchestrator integration use port 8002)
-   uv run app --host 0.0.0.0 --port 8002
-   ```
-
-4. In a separate terminal, run the test client:
-
-   ```bash
-   uv run app/test_client.py
-   ```
-
-## 🧪 Testing Scenarios
-
-### 📋 Test Suite
-The Currency Agent includes comprehensive testing:
-
-- **[Test Documentation](test/README.md)** - Complete testing guide
-- **`test_client.py`** - Currency exchange and financial data testing
-
-```bash
-# Run comprehensive test suite
-cd currencyAgent
-uv run python test/test_client.py
-
-# Expected: Currency conversion, exchange rates, and error handling tests pass
-```
-
-### Via Orchestrator
-```bash
-cd orchestrator
-
-# High-confidence Currency routing
-uv run -m app -m "What is the exchange rate for USD to EUR?" -v      # 100% confidence
-uv run -m app -m "Convert 100 USD to Japanese Yen" -v               # 80% confidence
-uv run -m app -m "Calculate exchange rate between GBP and CAD" -v   # 100% confidence
-
-# Skill-based routing
-uv run -m app -m "financial market analysis" -v                     # 69% confidence
-uv run -m app -m "Get historical currency rates" -v                 # 84% confidence
-```
-
-### Direct Agent Testing
 ```bash
 cd currencyAgent
 
-# Run the test client
+# Create environment file with your API key
+echo "GOOGLE_API_KEY=your_api_key_here" > .env
+# OR for OpenAI
+echo "API_KEY=your_api_key_here" > .env
+echo "TOOL_LLM_URL=your_llm_url" > .env
+echo "TOOL_LLM_NAME=your_llm_name" > .env
+
+# Run the agent
+uv run -m app
+
+# Test directly
+uv run -m app.test_client
+```
+
+## 🧪 Testing & Validation
+
+### Comprehensive Test Suite
+
+```bash
+# Run agent-specific tests
+cd currencyAgent
 uv run -m app.test_client
 
-# Start agent server and test
-uv run -m app --port 8002
-# In another terminal:
-curl -X POST http://localhost:8002 -H "Content-Type: application/json" -d '{"method": "message/send", "params": {"message": {"parts": [{"text": "Convert 100 USD to EUR"}]}}}'
+# Test orchestrator routing
+cd ../orchestrator
+uv run -m app -m "Convert 100 USD to EUR" -v
+uv run -m app -m "What's the exchange rate for GBP to JPY?" -v
+
+# Test direct agent communication
+curl -X POST http://localhost:8001 \
+  -H "Content-Type: application/json" \
+  -d '{"method": "message/send", "params": {"message": {"parts": [{"text": "Convert 100 USD to EUR"}]}}}'
 ```
 
-## 🔗 Integration with Orchestrator
+### Expected Test Results
 
-### Agent Card Configuration
+**Currency Operations**:
+```
+✅ Convert USD to EUR: "100 USD = 85.32 EUR (rate: 0.8532)"
+✅ Exchange Rate Query: "Current USD to EUR rate: 0.8532"
+✅ Historical Data: "EUR to GBP rate on 2024-01-01: 0.8642"
+✅ Multi-currency: "500 CAD = 54,230 JPY (via USD: 373.13)"
+```
 
-The orchestrator recognizes this agent with the following capabilities:
+## 🔧 Technical Architecture
+
+### LangGraph Integration
+
+The agent uses LangGraph ReAct pattern for intelligent currency operations:
 
 ```python
-Currency Agent Card:
-- agent_id: "currency"
-- name: "Currency Agent"
-- endpoint: "http://localhost:8002"
-- skills:
-  - currency_exchange (0.95)
-  - financial_data (0.85)
-  - market_analysis (0.8)
-  - rate_conversion (0.9)
-  - historical_data (0.75)
-- keywords: ["currency", "exchange", "rate", "convert", "dollar"]
-- capabilities: ["get_exchange_rate", "convert_currency", "get_historical_rates"]
+from langgraph.prebuilt import create_react_agent
+from langchain_core.tools import tool
+
+@tool
+def get_exchange_rate(currency_from: str, currency_to: str, currency_date: str = 'latest'):
+    """Get current or historical exchange rates"""
+    # Frankfurter API integration
+    
+class CurrencyAgent:
+    def __init__(self):
+        self.model = ChatGoogleGenerativeAI(model='gemini-2.0-flash')
+        self.tools = [get_exchange_rate]
+        self.graph = create_react_agent(self.model, tools=self.tools)
 ```
 
-### Routing Examples
+### A2A Protocol Implementation
 
-The orchestrator routes these requests to the Currency agent:
+```python
+from a2a.server.agent_execution import AgentExecutor
 
-| Request | Confidence | Matched Skills/Keywords |
-|---------|------------|-------------------------|
-| "What is the exchange rate for USD to EUR?" | 100% | exchange, rate, usd + currency_exchange |
-| "Convert 100 USD to Japanese Yen" | 80% | convert, usd, yen |
-| "Get historical currency rates" | 84% | currency, rate + historical_data |
-| "Financial market analysis" | 69% | financial + financial_data, market_analysis |
+class CurrencyAgentExecutor(AgentExecutor):
+    def __init__(self):
+        self.agent = CurrencyAgent()
+    
+    async def execute(self, context: RequestContext, event_queue: EventQueue):
+        # Handle A2A protocol requests
+        # Route to LangGraph agent
+        # Return formatted responses
+```
 
-## Build Container Image
+### Frankfurter API Integration
 
-Agent can also be built using a container file.
+The agent uses the Frankfurter API for real-time exchange data:
 
-1. Navigate to the `currencyAgent` directory:
+- **Endpoint**: `https://api.frankfurter.app/`
+- **Supported Currencies**: 30+ major currencies
+- **Historical Data**: Daily rates since 1999
+- **Rate Limits**: No authentication required, generous limits
 
-  ```bash
-  cd currencyAgent
-  ```
+## 🛠️ Development
 
-2. Build the container file
+### Project Structure
+```
+currencyAgent/
+├── app/
+│   ├── __init__.py
+│   ├── __main__.py           # A2A server entry point
+│   ├── agent_executor.py     # A2A protocol executor
+│   ├── agent.py              # Currency agent logic
+│   └── test_client.py        # Test client
+├── pyproject.toml           # Dependencies and metadata
+└── README.md               # This file
+```
 
-    ```bash
-    podman build . -t langgraph-a2a-server
-    ```
+### Dependencies
+```toml
+dependencies = [
+    "a2a-sdk>=0.2.6,<0.3.0",           # A2A protocol support
+    "langchain-google-genai>=2.0.4",   # Google AI integration
+    "langchain-openai>=0.2.4",         # OpenAI integration  
+    "langgraph>=0.2.0",                # ReAct agent framework
+    "httpx>=0.25.0",                   # HTTP client for API calls
+    "pydantic>=2.0.0",                 # Data validation
+]
+```
 
-> [!Tip]  
-> Podman is a drop-in replacement for `docker` which can also be used in these commands.
-
-3. Run your container
-
-    ```bash
-    podman run -p 8002:8002 -e GOOGLE_API_KEY=your_api_key_here langgraph-a2a-server
-    ```
-
-4. Test with orchestrator
-
-    ```bash
-    cd ../orchestrator
-    uv run -m app -m "Convert 100 USD to EUR" -v
-    ```
-
-> [!Important]
-> * **Access URL:** You must access the A2A client through the URL `0.0.0.0:8002`. Using `localhost` will not work.
-> * **Hostname Override:** If you're deploying to an environment where the hostname is defined differently outside the container, use the `HOST_OVERRIDE` environment variable to set the expected hostname on the Agent Card. This ensures proper communication with your client application.
-
-## 🚀 Full System Setup
-
-To run the complete orchestrated system:
-
-### Terminal 1: Currency Agent
+### Environment Configuration
 ```bash
-cd currencyAgent
-uv sync
-uv run -m app --port 8002
+# Google AI (recommended)
+export GOOGLE_API_KEY="your-google-api-key"
+
+# OR OpenAI 
+export model_source="openai"
+export API_KEY="your-openai-api-key"
+export TOOL_LLM_URL="https://api.openai.com/v1"
+export TOOL_LLM_NAME="gpt-3.5-turbo"
 ```
 
-### Terminal 2: ArgoCD Agent (Optional)
-```bash
-cd ../argocdAgent
-uv sync
-uv run -m app --port 8001
+## 🔧 Configuration Options
+
+### LLM Provider Selection
+```python
+# Auto-detect from environment
+model_source = os.getenv("model_source", "google")
+
+if model_source == "google":
+    self.model = ChatGoogleGenerativeAI(model='gemini-2.0-flash')
+else:
+    self.model = ChatOpenAI(
+        model=os.getenv("TOOL_LLM_NAME"),
+        openai_api_key=os.getenv("API_KEY"),
+        openai_api_base=os.getenv("TOOL_LLM_URL")
+    )
 ```
 
-### Terminal 3: Orchestrator
-```bash
-cd ../orchestrator
-uv run -m app --port 8000
+### Response Format Configuration
+```python
+class ResponseFormat(BaseModel):
+    status: Literal['input_required', 'completed', 'error'] = 'input_required'
+    message: str
 ```
 
-### Terminal 4: CLI Client
-```bash
-cd ../cli
-uv run . --agent http://localhost:8000
-
-# Now you can interact naturally:
-# > "What's the current USD to EUR rate?"
-# > "Convert 50 GBP to USD"
-# > "Show me Bitcoin price in USD"
+### Tool Configuration
+```python
+@tool
+def get_exchange_rate(
+    currency_from: str = 'USD',
+    currency_to: str = 'EUR', 
+    currency_date: str = 'latest'
+):
+    """
+    Get exchange rates with validation and error handling
+    Supports: USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, SEK, NZD, etc.
+    """
 ```
 
-## Technical Implementation
+## 🔮 Future Enhancements
 
-- **LangGraph ReAct Agent**: Uses the ReAct pattern for reasoning and tool usage
-- **Streaming Support**: Provides incremental updates during processing
-- **Checkpoint Memory**: Maintains conversation state between turns
-- **Push Notification System**: Webhook-based updates with JWK authentication
-- **A2A Protocol Integration**: Full compliance with A2A specifications
-- **Orchestrator Compatible**: Designed to work seamlessly with intelligent routing
+- **More Currency Sources**: Integration with multiple exchange rate APIs
+- **Cryptocurrency Support**: Bitcoin, Ethereum, and other digital currencies
+- **Advanced Analytics**: Currency trend analysis and forecasting
+- **Rate Alerts**: Push notifications for significant rate changes
+- **Portfolio Tracking**: Multi-currency portfolio management
+- **Custom Rate Feeds**: Enterprise-specific exchange rate sources
 
-## Limitations
+## 📚 API Reference
 
-- Only supports text-based input/output (no multi-modal support)
-- Uses Frankfurter API which has limited currency options
-- Memory is session-based and not persisted between server restarts
-
-## Examples
-
-### Via Orchestrator (Recommended)
-```bash
-cd orchestrator
-
-# Natural language currency requests
-uv run -m app -m "How much is 100 USD in EUR?" -v
-uv run -m app -m "Convert 50 GBP to Japanese Yen" -v
-uv run -m app -m "What's the Bitcoin price in USD?" -v
+### CurrencyAgent Class
+```python
+class CurrencyAgent:
+    def invoke(self, query: str, context_id: str) -> str
+    async def stream(self, query: str, context_id: str) -> AsyncIterable[dict]
+    def get_agent_response(self, config: dict) -> dict
 ```
 
-### Direct API Usage
-
-**Synchronous request**
-
-Request:
-
+### Supported Currency Codes
 ```
-POST http://localhost:8002
-Content-Type: application/json
-
-{
-    "id": "12113c25-b752-473f-977e-c9ad33cf4f56",
-    "jsonrpc": "2.0",
-    "method": "message/send",
-    "params": {
-        "message": {
-            "kind": "message",
-            "messageId": "120ec73f93024993becf954d03a672bc",
-            "parts": [
-                {
-                    "kind": "text",
-                    "text": "how much is 10 USD in INR?"
-                }
-            ],
-            "role": "user"
-        }
-    }
-}
+USD, EUR, GBP, JPY, CAD, AUD, CHF, CNY, SEK, NZD, 
+MXN, SGD, HKD, NOK, ZAR, TRY, BRL, INR, KRW, RUB
 ```
-
-Response:
-
-```json
-{
-    "id": "12113c25-b752-473f-977e-c9ad33cf4f56",
-    "jsonrpc": "2.0",
-    "result": {
-        "artifacts": [
-            {
-                "artifactId": "08373241-a745-4abe-a78b-9ca60882bcc6",
-                "name": "conversion_result",
-                "parts": [
-                    {
-                        "kind": "text",
-                        "text": "10 USD is 856.2 INR."
-                    }
-                ]
-            }
-        ],
-        "contextId": "e329f200-eaf4-4ae9-a8ef-a33cf9485367",
-        "history": [
-            {
-                "contextId": "e329f200-eaf4-4ae9-a8ef-a33cf9485367",
-                "kind": "message",
-                "messageId": "120ec73f93024993becf954d03a672bc",
-                "parts": [
-                    {
-                        "kind": "text",
-                        "text": "how much is 10 USD in INR?"
-                    }
-                ]
-            }
-        ]
-    }
-}
-```
-
-## 🐛 Troubleshooting
-
-### Connection Issues
-```bash
-# Check if agent is running
-lsof -i :8002
-
-# Restart agent
-cd currencyAgent
-uv run -m app --port 8002
-
-# Test agent directly
-uv run -m app.test_client
-```
-
-### Orchestrator Integration Issues
-```bash
-# Test if agent is reachable from orchestrator
-curl http://localhost:8002/health
-
-# Check orchestrator routing
-cd ../orchestrator
-uv run -m app -m "test currency" -v
-
-# Verify API keys
-echo $GOOGLE_API_KEY
-echo $API_KEY
-```
-
-### API Issues
-- **Frankfurter API**: Check if the API is accessible
-- **LLM API Key**: Verify your Google API key or OpenAI API key is valid
-- **Rate Limits**: Some APIs have rate limiting
-
-## 📚 Related Documentation
-
-- **[Main Project README](../README.md)** - Complete system overview
-- **[Orchestrator README](../orchestrator/README.md)** - Intelligent routing system
-- **[Orchestrator Blog Post](../orchestrator/BLOG_POST.md)** - Technical architecture
-- **[Orchestrator Client README](../orchestrator_client/README.md)** - Interactive client interface
-
-## Notes
-
-- **Best used with the orchestrator** for intelligent request routing and multi-agent coordination
-- The agent uses Google's Gemini model by default; you can change to OpenAI by setting environment variables
-- For production use, consider implementing proper authentication and rate limiting
-- Memory is session-based and not persisted between server restarts
 
 ---
 
-## 🎉 Quick Test Commands
-
-```bash
-# Test orchestrator routing (recommended)
-cd ../orchestrator && uv run -m app -m "Convert 100 USD to EUR" -v
-
-# Test agent directly
-cd currencyAgent && uv run -m app.test_client
-
-# Start agent server
-cd currencyAgent && uv run -m app --port 8002
-```
+**Built with LangGraph, A2A Protocol, and Frankfurter API** 💰

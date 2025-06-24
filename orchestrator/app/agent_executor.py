@@ -26,10 +26,11 @@ from app.orchestrator import SmartOrchestrator
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Support three major features:
+# Support four major features:
 # 1. List available agents: LIST_AGENTS
 # 2. Register an agent: REGISTER_AGENT:<agent_url>
-# 3. Process a request through the orchestrator: <request>
+# 3. Unregister an agent: UNREGISTER_AGENT:<agent_id>
+# 4. Process a request through the orchestrator: <request>
 
 class OrchestratorAgentExecutor(AgentExecutor):
     """Orchestrator Agent Executor for intelligent request routing"""
