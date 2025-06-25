@@ -2,6 +2,7 @@
 Orchestrator Agent Executor
 """
 import logging
+import json
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -39,6 +40,7 @@ class OrchestratorAgentExecutor(AgentExecutor):
         logger.info("Initializing OrchestratorAgentExecutor...")
         self.orchestrator = SmartOrchestrator()
         logger.info(f"Orchestrator initialized with agents: {list(self.orchestrator.agents.keys())}")
+        logger.info(f"Agent capabilities extracted: {len(self.orchestrator.agent_capabilities)}")
 
     async def execute(
         self,
@@ -81,7 +83,6 @@ class OrchestratorAgentExecutor(AgentExecutor):
                 logger.info(f"Available agents: {len(agents)}")
                 
                 # Format as JSON for the client
-                import json
                 response_text = json.dumps({
                     "type": "agent_list",
                     "agents": agents,
@@ -136,6 +137,15 @@ class OrchestratorAgentExecutor(AgentExecutor):
                         logger.info(f"    • State Transition History: {capabilities.stateTransitionHistory}")
                         
                         logger.info("-" * 40)
+                    
+                    # Log extracted capabilities
+                    if agent_id in self.orchestrator.agent_capabilities:
+                        agent_cap = self.orchestrator.agent_capabilities[agent_id]
+                        logger.info(f"  Extracted Capabilities:")
+                        logger.info(f"    • Domains: {', '.join(agent_cap['domains'])}")
+                        logger.info(f"    • Keywords: {', '.join(agent_cap['keywords'])}")
+                        if agent_cap['examples']:
+                            logger.info(f"    • Examples: {len(agent_cap['examples'])} examples")
                     
                     logger.info(f"Total registered agents: {len(self.orchestrator.agents)}")
                     logger.info("=" * 80)
@@ -192,14 +202,24 @@ class OrchestratorAgentExecutor(AgentExecutor):
                 
             else:
                 # Process the request through the orchestrator
-                result = await self.orchestrator.process_request(query)
-                logger.info(f"Orchestrator result: {result}")
-                
-                # Update task status
                 await updater.update_status(
                     TaskState.working,
                     new_agent_text_message(
-                        "Processing request through orchestrator...",
+                        "Analyzing request and selecting the best agent...",
+                        task.contextId,
+                        task.id,
+                    ),
+                )
+                
+                result = await self.orchestrator.process_request(query)
+                logger.info(f"Orchestrator result: {result}")
+                
+                # Update task status with routing decision
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(
+                        f"Routing decision: {result.get('selected_agent_name', 'No agent')} " +
+                        f"(confidence: {result.get('confidence', 0):.2f})",
                         task.contextId,
                         task.id,
                     ),
@@ -207,10 +227,15 @@ class OrchestratorAgentExecutor(AgentExecutor):
                 
                 # Format the response
                 if result.get("success", False):
-                    response_text = f"✅ Routed to {result.get('selected_agent_name', 'Unknown Agent')}\n"
-                    response_text += f"Confidence: {result.get('confidence', 0):.2f}\n"
-                    response_text += f"Reasoning: {result.get('reasoning', 'No reasoning provided')}\n"
-                    response_text += f"Response: {result.get('response', 'No response')}"
+                    if result.get("selected_agent_id"):
+                        response_text = f"✅ Routed to {result.get('selected_agent_name', 'Unknown Agent')}\n"
+                        response_text += f"Confidence: {result.get('confidence', 0):.2f}\n"
+                        response_text += f"Reasoning: {result.get('reasoning', 'No reasoning provided')}\n"
+                        response_text += f"Response: {result.get('response', 'No response')}"
+                    else:
+                        response_text = f"⚠️ No suitable agent found for this request\n"
+                        response_text += f"Reason: {result.get('reasoning', 'No reasoning provided')}\n"
+                        response_text += f"Available agents: {', '.join([a['name'] for a in self.orchestrator.get_available_agents()])}"
                 else:
                     response_text = f"❌ Error: {result.get('error', 'Unknown error')}"
                     logger.error(f"Orchestrator error: {result.get('error', 'Unknown error')}")
@@ -232,4 +257,4 @@ class OrchestratorAgentExecutor(AgentExecutor):
     async def cancel(
         self, request: RequestContext, event_queue: EventQueue
     ) -> Task | None:
-        raise ServerError(error=UnsupportedOperationError()) 
+        raise ServerError(error=UnsupportedOperationError())

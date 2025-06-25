@@ -5,12 +5,12 @@ Smart Orchestrator Agent with A2A SDK integration
 import asyncio
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict, Tuple, Any
+from a2a.client import A2AClient, A2ACardResolver
 
 import httpx
 from langgraph.graph import StateGraph
 from a2a.types import AgentCard, AgentSkill, AgentCapabilities
-from a2a.client import A2AClient, A2ACardResolver
 
 class RouterState(TypedDict):
     request: str
@@ -28,6 +28,7 @@ class SmartOrchestrator:
     def __init__(self):
         self.agents: Dict[str, AgentCard] = {}
         self.skill_keywords: Dict[str, List[str]] = {}
+        self.agent_capabilities: Dict[str, Dict[str, Any]] = {}
         self.workflow = self._create_workflow()
         self._initialize_default_agents()
     
@@ -58,8 +59,9 @@ class SmartOrchestrator:
                 except Exception as e:
                     print(f"❌ Error loading agent from {endpoint}: {e}")
         
-        # Update skill keywords after loading all default agents
+        # Update skill keywords and agent capabilities after loading all default agents
         self._update_skill_keywords()
+        self._extract_agent_capabilities()
     
     async def _fetch_agent_card_with_a2a(self, httpx_client: httpx.AsyncClient, endpoint: str) -> Optional[AgentCard]:
         """Fetch agent card using A2A client"""
@@ -82,6 +84,7 @@ class SmartOrchestrator:
         """Add a new agent using A2A SDK AgentCard"""
         self.agents[agent_id] = agent_card
         self._update_skill_keywords()
+        self._extract_agent_capabilities()
     
     def _update_skill_keywords(self):
         """Update skill keywords based on currently available agents"""
@@ -116,6 +119,56 @@ class SmartOrchestrator:
         
         print(f"Updated skill keywords for {len(self.skill_keywords)} skills from {len(self.agents)} agents")
     
+    def _extract_agent_capabilities(self):
+        """Extract and organize agent capabilities for better routing decisions"""
+        self.agent_capabilities = {}
+        
+        for agent_id, agent_card in self.agents.items():
+            # Initialize capabilities dictionary for this agent
+            self.agent_capabilities[agent_id] = {
+                "name": agent_card.name,
+                "description": agent_card.description,
+                "url": agent_card.url,
+                "skills": {},
+                "domains": set(),
+                "keywords": set(),
+                "examples": []
+            }
+            
+            # Extract capabilities from skills
+            for skill in agent_card.skills:
+                skill_id = skill.id if hasattr(skill, 'id') else skill.name.lower().replace(" ", "_")
+                
+                # Add skill details
+                self.agent_capabilities[agent_id]["skills"][skill_id] = {
+                    "name": skill.name,
+                    "description": skill.description,
+                    "tags": skill.tags if hasattr(skill, 'tags') and skill.tags else []
+                }
+                
+                # Add examples if available
+                if hasattr(skill, 'examples') and skill.examples:
+                    self.agent_capabilities[agent_id]["examples"].extend(skill.examples)
+                
+                # Extract domains from skill names and descriptions
+                if skill.name:
+                    domain_words = [word.lower() for word in skill.name.split() if len(word) > 3]
+                    self.agent_capabilities[agent_id]["domains"].update(domain_words)
+                
+                if skill.description:
+                    domain_words = [word.lower() for word in skill.description.split() if len(word) > 3]
+                    self.agent_capabilities[agent_id]["domains"].update(domain_words)
+                
+                # Add all tags as keywords
+                if hasattr(skill, 'tags') and skill.tags:
+                    self.agent_capabilities[agent_id]["keywords"].update([tag.lower() for tag in skill.tags])
+            
+            # Convert sets to lists for JSON serialization
+            self.agent_capabilities[agent_id]["domains"] = list(self.agent_capabilities[agent_id]["domains"])
+            self.agent_capabilities[agent_id]["keywords"] = list(self.agent_capabilities[agent_id]["keywords"])
+        
+        print(f"Extracted capabilities for {len(self.agent_capabilities)} agents")
+    
     async def register_agent(self, endpoint: str) -> Dict:
         """Register a new agent by fetching its agent card from the endpoint"""
         try:
@@ -128,6 +181,7 @@ class SmartOrchestrator:
                     # Add the agent to our registry
                     self.agents[agent_id] = agent_card
                     self._update_skill_keywords()
+                    self._extract_agent_capabilities()
                     
                     return {
                         "success": True,
@@ -179,6 +233,11 @@ class SmartOrchestrator:
             if agent_to_remove and agent_id_to_remove:
                 # Remove the agent from registry
                 del self.agents[agent_id_to_remove]
+                
+                # Also remove from capabilities
+                if agent_id_to_remove in self.agent_capabilities:
+                    del self.agent_capabilities[agent_id_to_remove]
+                
                 self._update_skill_keywords()
                 
                 return {
@@ -233,85 +292,79 @@ class SmartOrchestrator:
         return workflow.compile()
     
     async def _analyze_request(self, state: RouterState) -> RouterState:
-        """Analyze the request and select the best agent"""
+        """Analyze the request and select the best agent using intelligent routing"""
         request = state["request"]
         
-        best_agent = None
-        best_score = 0.0
+        # Get scores for all agents based on request content
         agent_scores = {}
         skill_matches = {}
+        semantic_matches = {}
         
         for agent_id, agent_card in self.agents.items():
-            score, matched_skills = self._calculate_agent_score(request, agent_card)
-            agent_scores[agent_id] = score
-            skill_matches[agent_id] = matched_skills
+            # Calculate score using multiple methods for better accuracy
+            keyword_score, matched_skills = self._calculate_keyword_score(request, agent_card)
+            semantic_score, semantic_reasons = self._calculate_semantic_score(request, agent_id)
             
+            # Combine scores with appropriate weights
+            # Keyword matching is more precise but limited, semantic matching is broader
+            combined_score = (keyword_score * 0.6) + (semantic_score * 0.4)
+            
+            agent_scores[agent_id] = combined_score
+            skill_matches[agent_id] = matched_skills
+            semantic_matches[agent_id] = semantic_reasons
+        
+        # Find the best agent based on combined score
+        best_agent = None
+        best_score = 0.0
+        
+        for agent_id, score in agent_scores.items():
             if score > best_score:
                 best_score = score
                 best_agent = agent_id
         
-        # Default to argocd if no clear winner
-        if best_agent is None:
-            best_agent = "argocd"
-            best_score = 0.3
+        # If no agent has a good score, don't default to any specific agent
+        # This makes the orchestrator more flexible and not biased toward any agent
+        if best_score < 0.2:  # Minimum threshold for confidence
+            best_agent = None
+            best_score = 0.0
+            reasoning = "No agent has sufficient capability to handle this request"
+        else:
+            # Calculate confidence (0.0 to 1.0)
+            confidence = min(best_score / 5.0, 1.0)
+            
+            # Generate reasoning based on matched skills and semantic analysis
+            reasoning = self._generate_reasoning(
+                request, 
+                best_agent, 
+                agent_scores, 
+                skill_matches, 
+                semantic_matches
+            )
         
-        # Calculate confidence (0.0 to 1.0)
-        confidence = min(best_score / 5.0, 1.0)
-        
-        # Generate reasoning
-        reasoning = self._generate_reasoning(request, best_agent, agent_scores, skill_matches)
-        
+        # Update state with routing decision
         state.update({
-            "selected_agent": best_agent,
-            "confidence": confidence,
+            "selected_agent": best_agent if best_agent else "",
+            "confidence": confidence if best_agent else 0.0,
             "reasoning": reasoning,
             "metadata": {
                 "request_id": str(uuid.uuid4()),
                 "start_timestamp": datetime.now().isoformat(),
                 "agent_scores": agent_scores,
                 "skill_matches": skill_matches,
+                "semantic_matches": semantic_matches,
                 "analysis_timestamp": datetime.now().isoformat()
             }
         })
         
         return state
     
-    def _calculate_agent_score(self, request: str, agent_card: AgentCard) -> tuple[float, List[str]]:
+    def _calculate_keyword_score(self, request: str, agent_card: AgentCard) -> Tuple[float, List[str]]:
         """
         Calculate score for an agent based on keywords and skills matching.
         
         Scoring mechanism:
         - Keyword matching from skill tags: +1.0 points per match
         - Skill matching via _skill_matches_request: +1.5 points per match
-        
-        Examples:
-        
-        1. Math calculation request: "what is 2+3"
-            - Math Agent: 
-              * Keywords: "what is", "+" → +2.0 points (from skill tags)
-              * Skills: "arithmetic_calculation" (matches "what is", "+") → +1.5 points
-              * Total: 3.5 points
-            - Currency Agent: 0.0 points (no matches)
-            - ArgoCD Agent: 0.0 points (no matches)
-            → Math Agent selected (highest score)
-
-        2. Currency conversion request: "how much is 10 USD in INR?"
-            - Currency Agent:
-              * Keywords: "usd", "inr" → +2.0 points (from skill tags)
-              * Skills: "currency_exchange" (matches "usd", "inr") → +1.5 points
-              * Total: 3.5 points
-            - Math Agent: 0.0 points (no currency-specific matches)
-            - ArgoCD Agent: 0.0 points (no matches)
-            → Currency Agent selected (highest score)
-        
-        3. ArgoCD management request: "sync my kubernetes application"
-            - ArgoCD Agent:
-             * Keywords: "kubernetes", "sync" → +2.0 points
-             * Skills: "sync_operations" (matches "sync"), "kubernetes_management" (matches "kubernetes") → +3.0 points
-             * Total: 5.0 points
-            - Math Agent: 0.0 points (no matches)
-            - Currency Agent: 0.0 points (no matches) 
-            → ArgoCD Agent selected (highest score)
         
         Returns:
             tuple[float, List[str]]: (total_score, list_of_matched_skill_names)
@@ -321,19 +374,68 @@ class SmartOrchestrator:
         
         request_lower = request.lower()
         
-                # Keyword matching from skill tags (weight: 1.0)
+        # Keyword matching from skill tags (weight: 1.0)
         keywords = [tag for skill in agent_card.skills for tag in (skill.tags or [])]
         for keyword in keywords:
             if keyword.lower() in request_lower:
                 score += 1.0
 
-        # Skill matching (weight: 1.5 - no confidence field available)
+        # Skill matching (weight: 1.5)
         for skill in agent_card.skills:
             if self._skill_matches_request(skill.name, request):
                 score += 1.5
                 matched_skills.append(skill.name)
         
         return score, matched_skills
+    
+    def _calculate_semantic_score(self, request: str, agent_id: str) -> Tuple[float, List[str]]:
+        """
+        Calculate semantic similarity score between request and agent capabilities.
+        This provides a more nuanced understanding beyond simple keyword matching.
+        
+        Returns:
+            tuple[float, List[str]]: (semantic_score, list_of_reasons)
+        """
+        score = 0.0
+        reasons = []
+        
+        # Skip if agent not in capabilities
+        if agent_id not in self.agent_capabilities:
+            return 0.0, []
+        
+        agent_cap = self.agent_capabilities[agent_id]
+        request_lower = request.lower()
+        
+        # Check for domain matches
+        for domain in agent_cap["domains"]:
+            if domain in request_lower:
+                score += 0.5
+                reasons.append(f"Request mentions domain: {domain}")
+        
+        # Check for keyword matches
+        for keyword in agent_cap["keywords"]:
+            if keyword in request_lower:
+                score += 0.7
+                reasons.append(f"Request contains keyword: {keyword}")
+        
+        # Check for example similarity
+        for example in agent_cap["examples"]:
+            # Simple similarity check - can be enhanced with embeddings
+            if any(word in example.lower() for word in request_lower.split()):
+                score += 0.3
+                reasons.append(f"Request similar to example: {example}")
+        
+        # Check skill descriptions for relevance
+        for skill_id, skill_info in agent_cap["skills"].items():
+            description = skill_info["description"].lower()
+            # Check if any significant words from request appear in description
+            significant_words = [w for w in request_lower.split() if len(w) > 3]
+            for word in significant_words:
+                if word in description:
+                    score += 0.4
+                    reasons.append(f"Request term '{word}' matches skill: {skill_info['name']}")
+        
+        return score, reasons[:3]  # Return top 3 reasons only
     
     def _skill_matches_request(self, skill_name: str, request: str) -> bool:
         """Check if a skill matches the request content using dynamic keywords from available agents"""
@@ -343,11 +445,21 @@ class SmartOrchestrator:
         
         return any(keyword in request_lower for keyword in keywords)
     
-    def _generate_reasoning(self, request: str, selected_agent: str, agent_scores: Dict, skill_matches: Dict) -> str:
+    def _generate_reasoning(
+        self, 
+        request: str, 
+        selected_agent: str, 
+        agent_scores: Dict, 
+        skill_matches: Dict,
+        semantic_matches: Dict
+    ) -> str:
         """Generate human-readable reasoning for the routing decision"""
+        if not selected_agent:
+            return "No suitable agent found for this request"
+            
         agent_card = self.agents[selected_agent]
         
-                # Find matched keywords from skill tags
+        # Find matched keywords from skill tags
         matched_keywords = []
         request_lower = request.lower()
         keywords = [tag for skill in agent_card.skills for tag in (skill.tags or [])]
@@ -356,8 +468,9 @@ class SmartOrchestrator:
             if keyword.lower() in request_lower:
                 matched_keywords.append(keyword)
         
-        # Get matched skills
+        # Get matched skills and semantic reasons
         matched_skills = skill_matches.get(selected_agent, [])
+        semantic_reasons = semantic_matches.get(selected_agent, [])
         
         reasoning_parts = [f"Selected {agent_card.name}"]
         
@@ -370,8 +483,11 @@ class SmartOrchestrator:
             else:
                 reasoning_parts.append(f"based on skills: {', '.join(matched_skills)}")
         
-        if not matched_keywords and not matched_skills:
-            reasoning_parts.append("using default ArgoCD agent")
+        if semantic_reasons:
+            reasoning_parts.append(f"with additional context: {'; '.join(semantic_reasons)}")
+        
+        if not matched_keywords and not matched_skills and not semantic_reasons:
+            reasoning_parts.append("based on best overall capability match")
         
         return " ".join(reasoning_parts)
     
@@ -379,6 +495,13 @@ class SmartOrchestrator:
         """Route the request to the selected agent"""
         selected_agent = state["selected_agent"]
         request = state["request"]
+        
+        # Handle case where no suitable agent was found
+        if not selected_agent:
+            state["response"] = "⚠️ No suitable agent found for this request. Please try a different query or register additional agents."
+            state["metadata"]["status"] = "no_agent_found"
+            state["metadata"]["response_timestamp"] = datetime.now().isoformat()
+            return state
         
         agent_card = self.agents[selected_agent]
         endpoint = agent_card.url
@@ -548,6 +671,20 @@ class SmartOrchestrator:
         try:
             final_state = await self.workflow.ainvoke(initial_state)
             
+            # Handle case where no agent was selected
+            if not final_state["selected_agent"]:
+                return {
+                    "success": True,
+                    "request": request,
+                    "selected_agent_id": "",
+                    "selected_agent_name": "None",
+                    "agent_skills": [],
+                    "confidence": 0.0,
+                    "reasoning": final_state["reasoning"],
+                    "response": final_state["response"],
+                    "metadata": final_state["metadata"]
+                }
+            
             agent_card = self.agents[final_state["selected_agent"]]
             
             return {
@@ -571,4 +708,5 @@ class SmartOrchestrator:
                     "request_id": str(uuid.uuid4()),
                     "error_timestamp": datetime.now().isoformat()
                 }
-            } 
+            }
+

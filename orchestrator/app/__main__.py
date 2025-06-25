@@ -13,6 +13,7 @@ from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryPushNotifier, InMemoryTaskStore
 from a2a.types import AgentCard, AgentSkill, AgentCapabilities
+from a2a.client import A2ACardResolver
 
 from app.orchestrator import SmartOrchestrator
 
@@ -46,6 +47,18 @@ def create_orchestrator_agent_card(host: str, port: int) -> AgentCard:
             name="Confidence Scoring",
             description="Confidence scoring for routing decisions",
             tags=["scoring", "confidence"]
+        ),
+        AgentSkill(
+            id="dynamic_agent_discovery",
+            name="Dynamic Agent Discovery",
+            description="Discover and integrate new agents dynamically",
+            tags=["discovery", "integration", "dynamic"]
+        ),
+        AgentSkill(
+            id="semantic_routing",
+            name="Semantic Routing",
+            description="Route requests based on semantic understanding",
+            tags=["semantic", "understanding", "context"]
         )
     ]
     
@@ -91,6 +104,13 @@ def main(host: str, port: int):
             agent_card=agent_card, http_handler=request_handler
         )
 
+        print(f"🚀 Starting Smart Orchestrator Agent on {host}:{port}")
+        print(f"📋 Agent Name: {agent_card.name}")
+        print(f"📝 Description: {agent_card.description}")
+        print(f"🎯 Skills: {', '.join([skill.name for skill in agent_card.skills])}")
+        print(f"⚙️  Capabilities: Intelligent routing, Dynamic agent discovery, Semantic understanding")
+        print(f"🔌 Pluggable: New agents can be registered at runtime")
+
         uvicorn.run(server.build(), host=host, port=port)
 
     except Exception as e:
@@ -99,4 +119,4 @@ def main(host: str, port: int):
 
 
 if __name__ == "__main__":
-    main() 
+    main()
