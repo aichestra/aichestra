@@ -345,6 +345,7 @@ async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str
 @click.option("--use_push_notifications", default=False)
 @click.option("--push_notification_receiver", default="http://localhost:5000")
 @click.option("--header", multiple=True)
+@click.option("--multiturn", is_flag=True, help="Enable multi-turn conversation mode")
 async def orchestratorClient(
     agent,
     list_agent,
@@ -355,6 +356,7 @@ async def orchestratorClient(
     use_push_notifications: bool,
     push_notification_receiver: str,
     header,
+    multiturn,
 ):
     headers = {h.split("=")[0]: h.split("=")[1] for h in header}
     print(f"Will use headers: {headers}")
@@ -404,31 +406,171 @@ async def orchestratorClient(
 
         continue_loop = True
         streaming = card.capabilities.streaming
-        context_id = session if session > 0 else uuid4().hex
+        # Convert session to string for contextId to avoid validation errors
+        context_id = str(session) if session > 0 else uuid4().hex
+        taskId = None
 
-        while continue_loop:
-            print("=========  starting a new task ======== ")
-            continue_loop, _, taskId = await completeTask(
-                client,
-                streaming,
-                use_push_notifications,
-                notification_receiver_host,
-                notification_receiver_port,
-                None,
-                context_id,
+        if multiturn:
+            # import pdb
+            # pdb.set_trace()
+            # Multi-turn conversation mode
+            print("\n" + "="*60)
+            print("🔄 MULTI-TURN CONVERSATION MODE ENABLED")
+            print("Type your initial question, then follow-up questions in subsequent prompts.")
+            print("Type ':q' or 'quit' to exit the conversation.")
+            print("="*60 + "\n")
+            
+            # Start with initial question
+            initial_prompt = click.prompt("\nWhat's your initial question?")
+            if initial_prompt.lower() in [":q", "quit"]:
+                return
+                
+            # Send initial message
+            message = Message(
+                role=Role.user,
+                parts=[Part(root=TextPart(text=initial_prompt))],
+                messageId=uuid4().hex,
             )
-
-            if history and continue_loop:
-                print("========= history ======== ")
-                task_response = await client.get_task(
-                    GetTaskRequest(
+            
+            payload = MessageSendParams(
+                message=message,
+                configuration=MessageSendConfiguration(
+                    acceptedOutputModes=["text"],
+                ),
+            )
+            
+            # Send the initial request
+            initial_response = await client.send_message(
+                SendMessageRequest(
+                    id=str(uuid4()),
+                    params=payload,
+                )
+            )
+            
+            # Extract task_id and context_id from the response
+            if hasattr(initial_response, 'root') and hasattr(initial_response.root, 'result'):
+                result = initial_response.root.result
+                if isinstance(result, Task):
+                    task_id = result.id
+                    context_id = result.contextId
+                    
+                    # Get the full task result
+                    task_response = await client.get_task(
+                        GetTaskRequest(
+                            id=str(uuid4()),
+                            params=TaskQueryParams(id=task_id),
+                        )
+                    )
+                    
+                    if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
+                        task_result = task_response.root.result
+                        task_content = task_result.model_dump_json(exclude_none=True)
+                        
+                        try:
+                            content_data = json.loads(task_content)
+                            if not format_ai_response(content_data):
+                                print(f"\n{task_content}")
+                        except:
+                            print(f"\n{task_content}")
+                elif isinstance(result, Message):
+                    context_id = result.contextId
+                    message_content = result.model_dump_json(exclude_none=True)
+                    
+                    try:
+                        content_data = json.loads(message_content)
+                        if not format_ai_response(content_data):
+                            print(f"\n{message_content}")
+                    except:
+                        print(f"\n{message_content}")
+            
+            # Continue with follow-up questions
+            while True:
+                follow_up = click.prompt("\nFollow-up question (or ':q' to quit)")
+                if follow_up.lower() in [":q", "quit"]:
+                    break
+                
+                # Create follow-up message with the same context
+                follow_up_message = Message(
+                    role=Role.user,
+                    parts=[Part(root=TextPart(text=follow_up))],
+                    messageId=uuid4().hex,
+                    taskId=task_id,
+                    contextId=context_id,
+                )
+                
+                follow_up_payload = MessageSendParams(
+                    message=follow_up_message,
+                    configuration=MessageSendConfiguration(
+                        acceptedOutputModes=["text"],
+                    ),
+                )
+                
+                # Send the follow-up request
+                follow_up_response = await client.send_message(
+                    SendMessageRequest(
                         id=str(uuid4()),
-                        params=TaskQueryParams(id=taskId or "", historyLength=10),
+                        params=follow_up_payload,
                     )
                 )
-                print(
-                    task_response.model_dump_json(include={"result": {"history": True}})
+                
+                # Process and display the response
+                if hasattr(follow_up_response, 'root') and hasattr(follow_up_response.root, 'result'):
+                    result = follow_up_response.root.result
+                    if isinstance(result, Task):
+                        task_id = result.id
+                        
+                        # Get the full task result
+                        task_response = await client.get_task(
+                            GetTaskRequest(
+                                id=str(uuid4()),
+                                params=TaskQueryParams(id=task_id),
+                            )
+                        )
+                        
+                        if hasattr(task_response, 'root') and hasattr(task_response.root, 'result'):
+                            task_result = task_response.root.result
+                            task_content = task_result.model_dump_json(exclude_none=True)
+                            
+                            try:
+                                content_data = json.loads(task_content)
+                                if not format_ai_response(content_data):
+                                    print(f"\n{task_content}")
+                            except:
+                                print(f"\n{task_content}")
+                    elif isinstance(result, Message):
+                        message_content = result.model_dump_json(exclude_none=True)
+                        
+                        try:
+                            content_data = json.loads(message_content)
+                            if not format_ai_response(content_data):
+                                print(f"\n{message_content}")
+                        except:
+                            print(f"\n{message_content}")
+        else:
+            # Standard single-turn mode
+            while continue_loop:
+                print("=========  starting a new task ======== ")
+                continue_loop, context_id, taskId = await completeTask(
+                    client,
+                    streaming,
+                    use_push_notifications,
+                    notification_receiver_host,
+                    notification_receiver_port,
+                    taskId,
+                    context_id,
                 )
+
+                if history and continue_loop:
+                    print("========= history ======== ")
+                    task_response = await client.get_task(
+                        GetTaskRequest(
+                            id=str(uuid4()),
+                            params=TaskQueryParams(id=taskId or "", historyLength=10),
+                        )
+                    )
+                    print(
+                        task_response.model_dump_json(include={"result": {"history": True}})
+                    )
 
 
 async def completeTask(
