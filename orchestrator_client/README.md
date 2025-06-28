@@ -170,6 +170,58 @@ uv run . --agent http://localhost:8000 --header "Authorization=Bearer token"
 uv run . --agent http://localhost:8000 --push_notification_receiver http://localhost:5000
 ```
 
+## 🌐 FastAPI Integration
+
+The orchestrator client now supports **FastAPI endpoints** for agent management, providing faster and more reliable operations.
+
+### FastAPI Agent Management
+
+```bash
+# List agents via FastAPI (faster than A2A protocol)
+uv run . --agent http://localhost:8000 --list_agent --use_fastapi
+
+# Register agent via FastAPI
+uv run . --agent http://localhost:8000 --register_agent http://localhost:8001 --use_fastapi
+
+# Unregister agent via FastAPI
+uv run . --agent http://localhost:8000 --unregister_agent "Math Agent" --use_fastapi
+
+# Show API documentation URLs
+uv run . --agent http://localhost:8000 --show_api_docs
+```
+
+### Testing FastAPI Integration
+
+```bash
+# Run comprehensive FastAPI tests
+python test_fastapi_integration.py
+
+# Run interactive demo
+python test_fastapi_integration.py --interactive
+
+# Show usage help
+python test_fastapi_integration.py --help
+```
+
+### FastAPI Features
+
+- ✅ **Faster Operations**: Direct HTTP calls instead of A2A protocol overhead
+- ✅ **Better Error Handling**: Structured error responses with details
+- ✅ **Automatic Fallback**: Falls back to A2A protocol if FastAPI unavailable
+- ✅ **Interactive Documentation**: Swagger UI at `/management/docs`
+- ✅ **Hybrid Client**: Supports both FastAPI and A2A protocols
+- ✅ **Type Safety**: Pydantic models for request/response validation
+
+### FastAPI vs A2A Protocol
+
+| Feature | FastAPI | A2A Protocol |
+|---------|---------|--------------|
+| Speed | ⚡ Fast | 🐌 Slower |
+| Error Handling | 📋 Structured | 📝 Basic |
+| Documentation | 📖 Interactive | ❌ None |
+| Fallback | ✅ Yes | N/A |
+| Type Safety | ✅ Pydantic | ❌ Limited |
+
 ## 🧪 Interactive Experience
 
 ### Agent Discovery Display

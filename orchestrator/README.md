@@ -110,6 +110,148 @@ uv run -m app -m "LIST_AGENTS"
 uv run -m app -m "REGISTER_AGENT:http://localhost:8080"
 ```
 
+## 🌐 FastAPI Agent Management Endpoints
+
+The orchestrator now includes **FastAPI endpoints** for programmatic agent management, providing both REST API and interactive documentation.
+
+### Starting the Server with API Endpoints
+
+```bash
+cd orchestrator
+uv sync
+uv run -m app --host localhost --port 8000
+```
+
+The server provides both:
+- **A2A Protocol endpoints** at `http://localhost:8000/` (for agent-to-agent communication)
+- **FastAPI Management endpoints** at `http://localhost:8000/management/` (for administration)
+
+### API Documentation
+
+📖 **Interactive API Docs**: `http://localhost:8000/management/docs`  
+📋 **Alternative Docs**: `http://localhost:8000/management/redoc`
+
+### Available Endpoints
+
+#### 1. List Agents
+```bash
+# GET request
+curl http://localhost:8000/management/api/v1/agents/list
+
+# Alternative GET endpoint
+curl http://localhost:8000/management/api/v1/agents/list_agents
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "agents": [
+    {
+      "agent_id": "Currency Agent",
+      "name": "Currency Agent",
+      "description": "Intelligent currency exchange and financial data agent",
+      "endpoint": "http://localhost:8002",
+      "skills": [
+        {"name": "Currency Exchange", "description": "Convert between currencies"}
+      ],
+      "keywords": ["currency", "exchange", "rate"],
+      "capabilities": ["pushNotifications"]
+    }
+  ],
+  "total_count": 1,
+  "message": "Found 1 registered agents"
+}
+```
+
+#### 2. Register Agent
+```bash
+# POST request (recommended)
+curl -X POST http://localhost:8000/management/api/v1/agents/register \
+     -H 'Content-Type: application/json' \
+     -d '{"endpoint": "http://localhost:8001"}'
+
+# GET request (alternative)
+curl 'http://localhost:8000/management/api/v1/agents/register_agent?endpoint=http://localhost:8001'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "agent_id": "Math Agent",
+  "agent_name": "Math Agent",
+  "endpoint": "http://localhost:8001",
+  "message": "Successfully registered Math Agent from http://localhost:8001"
+}
+```
+
+#### 3. Unregister Agent
+```bash
+# POST request (recommended)
+curl -X POST http://localhost:8000/management/api/v1/agents/unregister \
+     -H 'Content-Type: application/json' \
+     -d '{"agent_identifier": "Math Agent"}'
+
+# GET request (alternative)  
+curl 'http://localhost:8000/management/api/v1/agents/unregister_agent?agent_identifier=Math Agent'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "agent_id": "Math Agent",
+  "agent_name": "Math Agent", 
+  "endpoint": "http://localhost:8001",
+  "message": "Successfully unregistered Math Agent (ID: Math Agent)"
+}
+```
+
+### Python Client Usage
+
+Use the provided test client for programmatic access:
+
+```python
+from test_agent_management_api import AgentManagementClient
+
+client = AgentManagementClient("http://localhost:8000")
+
+# List agents
+agents = await client.list_agents()
+print(f"Found {agents['total_count']} agents")
+
+# Register new agent
+result = await client.register_agent("http://localhost:8004")
+if result['success']:
+    print(f"Registered: {result['agent_name']}")
+
+# Unregister agent
+result = await client.unregister_agent("Math Agent")
+if result['success']:
+    print(f"Unregistered: {result['agent_name']}")
+```
+
+### Testing the API
+
+```bash
+# Run the test client
+python test_agent_management_api.py
+
+# Run with help for examples
+python test_agent_management_api.py --help
+```
+
+### API Features
+
+- ✅ **RESTful Design**: Proper HTTP methods and status codes
+- ✅ **Input Validation**: Pydantic models for request/response validation  
+- ✅ **Error Handling**: Comprehensive error responses with details
+- ✅ **Interactive Docs**: Swagger UI and ReDoc documentation
+- ✅ **CORS Support**: Cross-origin requests enabled
+- ✅ **Multiple Formats**: Both POST (JSON) and GET (query params) support
+- ✅ **Async Operations**: Non-blocking agent registration/deregistration
+
 ## 🔧 Running the Full System
 
 ### Step 1: Start the Agents

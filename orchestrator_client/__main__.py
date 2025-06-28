@@ -32,6 +32,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.push_notification_auth import PushNotificationReceiverAuth
+from fastapi_client import OrchestratorFastAPIClient, HybridOrchestratorClient
 
 
 def format_ai_response(content):
@@ -268,7 +269,7 @@ async def send_orchestrator_command(httpx_client, orchestrator_url: str, command
 
 
 async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
-    """Get agent list from orchestrator via API call"""
+    """Get agent list from orchestrator via API call (A2A protocol fallback)"""
     try:
         response = await send_orchestrator_command(httpx_client, orchestrator_url, "LIST_AGENTS", timeout_seconds=5)
         
@@ -287,8 +288,72 @@ async def get_agents_from_orchestrator(httpx_client, orchestrator_url: str):
         return []
 
 
+async def get_agents_via_fastapi(orchestrator_url: str):
+    """Get agent list from orchestrator via FastAPI endpoint"""
+    try:
+        fastapi_client = OrchestratorFastAPIClient(orchestrator_url)
+        result = await fastapi_client.list_agents()
+        
+        if result.get("success", False):
+            return result.get("agents", [])
+        else:
+            print(f"⚠️  FastAPI request failed: {result.get('error', 'Unknown error')}")
+            return []
+    except Exception as e:
+        print(f"⚠️  Could not get agent list via FastAPI: {e}")
+        return []
+
+
+async def list_available_agents_enhanced(httpx_client, agent_url: str, card, use_fastapi: bool = True):
+    """Enhanced agent listing with FastAPI support"""
+    try:
+        # Check if this is the orchestrator by looking at the agent card
+        if "orchestrator" in card.name.lower() or "routing" in card.description.lower():
+            print("\n" + "="*60)
+            print("🤖 AVAILABLE AGENTS")
+            print("="*60)
+            
+            available_agents = []
+            
+            # Try FastAPI first if enabled
+            if use_fastapi:
+                print("🔄 Fetching agents via FastAPI...")
+                available_agents = await get_agents_via_fastapi(agent_url)
+                
+                if not available_agents:
+                    print("⚠️  FastAPI failed, falling back to A2A protocol...")
+                    available_agents = await get_agents_from_orchestrator(httpx_client, agent_url)
+            else:
+                print("🔄 Fetching agents via A2A protocol...")
+                available_agents = await get_agents_from_orchestrator(httpx_client, agent_url)
+            
+            if available_agents:
+                print(f"Found {len(available_agents)} available agents:")
+                for i, agent in enumerate(available_agents, 1):
+                    print(f"\n{i}. {agent['name']} ({agent['endpoint']})")
+                    print(f"   Description: {agent['description']}")
+                    if agent.get('skills'):
+                        skills_text = ", ".join([skill.get('name', 'Unknown') for skill in agent['skills'][:3]])
+                        if len(agent['skills']) > 3:
+                            skills_text += f" (+{len(agent['skills'])-3} more)"
+                        print(f"   Skills: {skills_text}")
+                print("\n" + "="*60)
+                print("💡 The orchestrator will automatically route your requests to the best agent!")
+                
+                # Show FastAPI documentation links if available
+                if use_fastapi:
+                    fastapi_client = OrchestratorFastAPIClient(agent_url)
+                    print(f"📖 API Documentation: {fastapi_client.get_docs_url()}")
+            else:
+                print("⚠️  No agents currently available")
+            print("="*60)
+    except Exception as e:
+        # Silently fail if we can't get agent info
+        pass
+
+
 async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, agent_url: str):
-    """Register an agent with the orchestrator"""
+    """Register an agent with the orchestrator (A2A protocol)"""
     print(f"🔄 Registering agent {agent_url} with orchestrator {orchestrator_url}")
     
     try:
@@ -312,7 +377,7 @@ async def register_agent_with_orchestrator(httpx_client, orchestrator_url: str, 
 
 
 async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str, agent_identifier: str):
-    """Unregister an agent from the orchestrator"""
+    """Unregister an agent from the orchestrator (A2A protocol)"""
     print(f"🔄 Unregistering agent {agent_identifier} from orchestrator {orchestrator_url}")
     
     try:
@@ -335,11 +400,83 @@ async def unregister_agent_with_orchestrator(httpx_client, orchestrator_url: str
         print(f"❌ Unregistration failed: {e}")
 
 
+async def register_agent_via_fastapi(orchestrator_url: str, agent_url: str):
+    """Register an agent with the orchestrator via FastAPI"""
+    print(f"🔄 Registering agent {agent_url} with orchestrator (FastAPI) {orchestrator_url}")
+    
+    try:
+        fastapi_client = OrchestratorFastAPIClient(orchestrator_url)
+        print(f"📤 Sending FastAPI registration request...")
+        result = await fastapi_client.register_agent(agent_url)
+        
+        if result.get("success", False):
+            print(f"🎉 Registration completed successfully!")
+            print(f"📄 Agent ID: {result.get('agent_id')}")
+            print(f"📄 Agent Name: {result.get('agent_name')}")
+            print(f"📄 Message: {result.get('message')}")
+        else:
+            print(f"❌ Registration failed: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        print(f"❌ Registration failed: {e}")
+
+
+async def unregister_agent_via_fastapi(orchestrator_url: str, agent_identifier: str):
+    """Unregister an agent from the orchestrator via FastAPI"""
+    print(f"🔄 Unregistering agent {agent_identifier} from orchestrator (FastAPI) {orchestrator_url}")
+    
+    try:
+        fastapi_client = OrchestratorFastAPIClient(orchestrator_url)
+        print(f"📤 Sending FastAPI unregistration request...")
+        result = await fastapi_client.unregister_agent(agent_identifier)
+        
+        if result.get("success", False):
+            print(f"🎉 Unregistration completed successfully!")
+            print(f"📄 Agent ID: {result.get('agent_id')}")
+            print(f"📄 Agent Name: {result.get('agent_name')}")
+            print(f"📄 Message: {result.get('message')}")
+        else:
+            print(f"❌ Unregistration failed: {result.get('error', 'Unknown error')}")
+            
+    except Exception as e:
+        print(f"❌ Unregistration failed: {e}")
+
+
+async def hybrid_register_agent(orchestrator_url: str, agent_url: str, prefer_fastapi: bool = True):
+    """Register agent using hybrid approach (FastAPI first, A2A fallback)"""
+    if prefer_fastapi:
+        try:
+            await register_agent_via_fastapi(orchestrator_url, agent_url)
+            return
+        except Exception as e:
+            print(f"⚠️  FastAPI registration failed, falling back to A2A: {e}")
+    
+    # Fallback to A2A
+    async with httpx.AsyncClient(timeout=30) as httpx_client:
+        await register_agent_with_orchestrator(httpx_client, orchestrator_url, agent_url)
+
+
+async def hybrid_unregister_agent(orchestrator_url: str, agent_identifier: str, prefer_fastapi: bool = True):
+    """Unregister agent using hybrid approach (FastAPI first, A2A fallback)"""
+    if prefer_fastapi:
+        try:
+            await unregister_agent_via_fastapi(orchestrator_url, agent_identifier)
+            return
+        except Exception as e:
+            print(f"⚠️  FastAPI unregistration failed, falling back to A2A: {e}")
+    
+    # Fallback to A2A
+    async with httpx.AsyncClient(timeout=30) as httpx_client:
+        await unregister_agent_with_orchestrator(httpx_client, orchestrator_url, agent_identifier)
+
+
 @click.command()
 @click.option("--agent", default="http://localhost:8000")
 @click.option("--list_agent", is_flag=True, help="List all available agents from orchestrator")
 @click.option("--register_agent", default="")
 @click.option("--unregister_agent", default="")
+@click.option("--use_fastapi", is_flag=True, help="Use FastAPI endpoints instead of A2A protocol for agent management")
+@click.option("--show_api_docs", is_flag=True, help="Show FastAPI documentation URLs")
 @click.option("--session", default=0)
 @click.option("--history", default=False)
 @click.option("--use_push_notifications", default=False)
@@ -351,6 +488,8 @@ async def orchestratorClient(
     list_agent,
     register_agent,
     unregister_agent,
+    use_fastapi,
+    show_api_docs,
     session,
     history,
     use_push_notifications: bool,
@@ -367,21 +506,40 @@ async def orchestratorClient(
         print("======= Agent Card ========")
         print(card.model_dump_json(exclude_none=True))
         
+        # Handle show_api_docs flag
+        if show_api_docs:
+            fastapi_client = OrchestratorFastAPIClient(agent)
+            print("\n" + "="*60)
+            print("📖 FASTAPI DOCUMENTATION")
+            print("="*60)
+            print(f"Interactive API Docs: {fastapi_client.get_docs_url()}")
+            print(f"Alternative Docs: {fastapi_client.get_redoc_url()}")
+            print("="*60)
+            return
+
         # Handle list_agent flag
         if list_agent:
-            await list_available_agents(httpx_client, agent, card)
+            await list_available_agents_enhanced(httpx_client, agent, card, use_fastapi)
             return
         
         # Handle register_agent option
         if register_agent != "":
-            await register_agent_with_orchestrator(httpx_client, agent, register_agent)
+            if use_fastapi:
+                await register_agent_via_fastapi(agent, register_agent)
+            else:
+                await register_agent_with_orchestrator(httpx_client, agent, register_agent)
             return
+            
+        # Handle unregister_agent option
         if unregister_agent != "":
-            await unregister_agent_with_orchestrator(httpx_client, agent, unregister_agent)
+            if use_fastapi:
+                await unregister_agent_via_fastapi(agent, unregister_agent)
+            else:
+                await unregister_agent_with_orchestrator(httpx_client, agent, unregister_agent)
             return
 
         # Default behavior: show available agents and continue with interactive mode
-        await list_available_agents(httpx_client, agent, card)
+        await list_available_agents_enhanced(httpx_client, agent, card, use_fastapi)
 
         notif_receiver_parsed = urllib.parse.urlparse(push_notification_receiver)
         notification_receiver_host = notif_receiver_parsed.hostname or "localhost"
