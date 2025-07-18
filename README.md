@@ -2,6 +2,10 @@
 
 An advanced multi-agent system built with **LangGraph** and **A2A Protocol** that features intelligent request routing, specialized agents for different domains, and dynamic capability discovery.
 
+## Blog
+
+- [Building an Intelligent Multi-Agent Orchestration System with LangGraph, A2A and MCP](https://medium.com/@gyliu513/building-an-intelligent-multi-agent-orchestration-system-with-langgraph-a2a-and-mcp-674efdf666f7)
+
 ## 🌟 Overview
 
 This project demonstrates a production-ready agent orchestration system where:
