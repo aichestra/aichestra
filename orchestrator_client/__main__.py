@@ -714,7 +714,7 @@ async def orchestratorClient(
                     use_push_notifications,
                     notification_receiver_host,
                     notification_receiver_port,
-                    taskId,
+                    None,  # Always pass None for taskId to create a new task
                     context_id,
                 )
 
@@ -824,6 +824,7 @@ async def completeTask(
             event = event.root.result
         except Exception as e:
             print("Failed to complete the call", e)
+            return False, contextId, taskId
         if not contextId:
             contextId = event.contextId
         if isinstance(event, Task):
