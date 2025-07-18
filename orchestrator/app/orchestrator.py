@@ -295,6 +295,12 @@ class SmartOrchestrator:
         """Analyze the request and select the best agent using intelligent routing"""
         request = state["request"]
         
+        # Log the start of agent selection
+        print(f"\n🔍 AGENT SELECTION STARTED")
+        print(f"📝 Request: '{request}'")
+        print(f"📊 Available agents: {list(self.agents.keys())}")
+        print(f"🎯 Analyzing {len(self.agents)} agents for best match...")
+        
         # Get scores for all agents based on request content
         agent_scores = {}
         skill_matches = {}
@@ -312,6 +318,12 @@ class SmartOrchestrator:
             agent_scores[agent_id] = combined_score
             skill_matches[agent_id] = matched_skills
             semantic_matches[agent_id] = semantic_reasons
+            
+            # Log detailed scoring for each agent
+            print(f"\n📈 Agent: {agent_card.name} (ID: {agent_id})")
+            print(f"   🔑 Keyword Score: {keyword_score:.2f} (matched skills: {matched_skills})")
+            print(f"   🧠 Semantic Score: {semantic_score:.2f} (reasons: {semantic_reasons})")
+            print(f"   📊 Combined Score: {combined_score:.2f}")
         
         # Find the best agent based on combined score
         best_agent = None
@@ -322,9 +334,15 @@ class SmartOrchestrator:
                 best_score = score
                 best_agent = agent_id
         
+        print(f"\n🎯 SCORING RESULTS:")
+        print(f"   🥇 Best Agent: {best_agent}")
+        print(f"   📊 Best Score: {best_score:.2f}")
+        print(f"   🔄 All Scores: {[(aid, f'{score:.2f}') for aid, score in sorted(agent_scores.items(), key=lambda x: x[1], reverse=True)]}")
+        
         # If no agent has a good score, don't default to any specific agent
         # This makes the orchestrator more flexible and not biased toward any agent
         if best_score < 0.2:  # Minimum threshold for confidence
+            print(f"❌ No agent meets minimum threshold (0.2), best score was {best_score:.2f}")
             best_agent = None
             best_score = 0.0
             reasoning = "No agent has sufficient capability to handle this request"
@@ -333,13 +351,22 @@ class SmartOrchestrator:
             confidence = min(best_score / 5.0, 1.0)
             
             # Generate reasoning based on matched skills and semantic analysis
-            reasoning = self._generate_reasoning(
-                request, 
-                best_agent, 
-                agent_scores, 
-                skill_matches, 
-                semantic_matches
-            )
+            if best_agent is not None:
+                reasoning = self._generate_reasoning(
+                    request, 
+                    best_agent, 
+                    agent_scores, 
+                    skill_matches, 
+                    semantic_matches
+                )
+            else:
+                reasoning = "No suitable agent found"
+        
+        print(f"\n✅ FINAL SELECTION:")
+        print(f"   🎯 Selected Agent: {self.agents[best_agent].name if best_agent else 'None'}")
+        print(f"   📊 Confidence: {confidence if best_agent else 0.0:.2f}")
+        print(f"   🧠 Reasoning: {reasoning}")
+        print(f"🔍 AGENT SELECTION COMPLETED\n")
         
         # Update state with routing decision
         state.update({
@@ -498,6 +525,7 @@ class SmartOrchestrator:
         
         # Handle case where no suitable agent was found
         if not selected_agent:
+            print(f"⚠️  No agent selected - returning error message")
             state["response"] = "⚠️ No suitable agent found for this request. Please try a different query or register additional agents."
             state["metadata"]["status"] = "no_agent_found"
             state["metadata"]["response_timestamp"] = datetime.now().isoformat()
@@ -506,14 +534,22 @@ class SmartOrchestrator:
         agent_card = self.agents[selected_agent]
         endpoint = agent_card.url
         
+        print(f"\n🚀 ROUTING REQUEST TO AGENT")
+        print(f"   🎯 Agent: {agent_card.name} (ID: {selected_agent})")
+        print(f"   🔗 Endpoint: {endpoint}")
+        print(f"   📝 Request: '{request}'")
+        
         state["metadata"]["agent_endpoint"] = endpoint
         
         try:
+            print(f"   📡 Forwarding request to agent...")
             # Forward the request to the selected agent and get the actual response
             actual_response = await self._forward_request_to_agent(endpoint, request)
+            print(f"   ✅ Received response from agent: '{actual_response[:100]}{'...' if len(actual_response) > 100 else ''}'")
             state["response"] = f"🎯 Routed to {agent_card.name} → {actual_response}"
             state["metadata"]["status"] = "completed"
         except Exception as e:
+            print(f"   ❌ Failed to forward request: {str(e)}")
             # Fallback to routing information if forwarding fails
             state["response"] = f"🎯 Smart Routing Decision\n\n"
             state["response"] += f"✅ Selected Agent: {agent_card.name}\n"
@@ -523,6 +559,8 @@ class SmartOrchestrator:
             state["response"] += f"⚠️ Could not forward request: {str(e)}\n"
             state["response"] += f"💡 Connect directly to {agent_card.name} at {endpoint}"
             state["metadata"]["status"] = "routing_only"
+        
+        print(f"🚀 REQUEST ROUTING COMPLETED\n")
         
         state["metadata"]["response_timestamp"] = datetime.now().isoformat()
         
@@ -651,8 +689,6 @@ class SmartOrchestrator:
                 
                 return "Unexpected response format from agent"
                 
-        except httpx.HTTPStatusError as e:
-            raise Exception(f"HTTP error {e.response.status_code}: {e.response.text}")
         except Exception as e:
             raise Exception(f"Request forwarding failed: {str(e)}")
 
