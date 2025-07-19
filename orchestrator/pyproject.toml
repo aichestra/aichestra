@@ -5,7 +5,6 @@ description = "A2A Orchestrator Agent using LangGraph for intelligent request ro
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "a2a-sdk>=0.2.6,<0.3.0",
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "httpx>=0.25.0",
@@ -13,6 +12,7 @@ dependencies = [
     "langgraph>=0.2.0",
     "langchain-core>=0.3.0",
     "typing-extensions>=4.5.0",
+    "a2a-sdk==0.2.10",
 ]
 
 [build-system]
