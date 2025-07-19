@@ -77,7 +77,7 @@ graph TD
 
 ### 💰 **Currency Agent** (Port 8080)  
 - **Skills**: `currency_exchange`, `financial_data`, `market_analysis`, `rate_conversion`
-- **Use Cases**: "Convert 100 USD to EUR", "What's the exchange rate?", "Historical rates"
+- **Use Cases**: "what is 10 USD to INR?", "What's the exchange rate?", "Historical rates"
 - **Integration**: Frankfurter API with LangGraph ReAct agent
 
 ### 🧮 **Math Agent** (Port 8081)
@@ -91,7 +91,7 @@ graph TD
 - **Python 3.10+** (required for A2A SDK compatibility)
 - **Node.js** (for ArgoCD MCP server)
 - **[uv](https://docs.astral.sh/uv/)** package manager
-- **API Keys** (Google Gemini or OpenAI)
+- **API Keys** (Google Gemini or OpenAI; for Google Gemini, ensure Gemini API is enabled under your Google Cloud project)
 
 ### 1. Install Dependencies
 ```bash
@@ -128,7 +128,7 @@ export NODE_TLS_REJECT_UNAUTHORIZED="0"  # If using self-signed certs
 cd orchestrator
 
 # Test intelligent routing
-uv run -m app -m "Convert 100 USD to EUR" -v
+uv run -m app -m "what is 10 USD to INR?" -v
 uv run -m app -m "What is 2+3?" -v
 uv run -m app -m "List ArgoCD applications" -v
 
@@ -140,9 +140,12 @@ uv run -m app -m "LIST_AGENTS"
 
 ### Option A: Full Multi-Agent System
 
+**Attention**: Need to follow the following exact order: ensure to run agents first, then run Orchestrator so that agents can be detected by orchestrator, lastly run orchestrate client for interactive QA.
+
 **Terminal 1: Currency Agent**
 ```bash
 cd currencyAgent
+export GOOGLE_API_KEY=your_google_api_key
 uv run -m app
 ```
 
@@ -173,7 +176,7 @@ cd orchestrator_client
 uv run . --agent http://localhost:8000
 
 # Try these routing examples:
-# > "Convert 100 USD to EUR"     → Currency Agent (100% confidence)
+# > "what is 10 USD to INR"     → Currency Agent (100% confidence)
 # > "What is 2+3?"               → Math Agent (95% confidence)
 # > "List all applications"      → ArgoCD Agent (100% confidence)
 ```
